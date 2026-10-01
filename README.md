@@ -71,6 +71,26 @@ Full instructions: [docs/user-guide/getting-started.md](docs/user-guide/getting-
 | Stop PostgreSQL                          | `pnpm db:down`                       |
 | Generate reports                         | Not yet available (Milestone 4)      |
 
+## Deployment
+
+**Live:** https://www.shragavi.com/civil-engineering-platform
+
+The workspace is fully client-side (the engine runs in the browser), so it ships as a static site on GitHub Pages.
+`.github/workflows/pages.yml` runs lint, typecheck and all engineering tests on every push to `main`; only if they
+pass does it build a static export (`STATIC_EXPORT=true`, base path from `actions/configure-pages`) and deploy it.
+The path works because the user site `ichbinashwin.github.io` owns the custom domain `www.shragavi.com`, so every
+project site is served at `www.shragavi.com/<repository>`.
+
+Local preview of the Pages build:
+
+```bash
+STATIC_EXPORT=true PAGES_BASE_PATH=/civil-engineering-platform pnpm --filter @civil/web build
+# output: apps/web/out
+```
+
+GitHub Pages cannot send HTTP headers; the static build carries its Content-Security-Policy as a `<meta>` tag. The
+Docker/server build (`docker/Dockerfile.web`) keeps the full header set.
+
 ## Engineering calculation methodology
 
 See [docs/engineering-basis/aci318-19-punching-shear.md](docs/engineering-basis/aci318-19-punching-shear.md).
