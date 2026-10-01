@@ -83,3 +83,14 @@ else console.log(outcome.reason, outcome.action);
 - **Sidebar hover:** pointing at a sidebar icon opens the same flyout as a click; it closes shortly after the pointer
   leaves both the icon and the flyout. A click _pins_ it open (until clicked again, Esc, or a click outside).
   The wallpaper doodles are small (about 26–30 px) like a chat wallpaper.
+- **Design code (US / EU):** the header switch with the US and EU flags selects **ACI 318-19** (US, kip / in / psi) or
+  **EN 1992-1-1** (Eurocode 2, EU, kN / mm / MPa). It defaults to US. Switching converts every value (rounded) to the
+  other unit system, swaps the labels (Vu ↔ VEd, f'c ↔ fck, ρl inputs for EU), recalculates with that code's own engine
+  and resets the 3D view (default camera, spin on). The EU module is **Experimental** (see
+  `docs/verification/en1992-1-1-punching-shear.md`).
+- **Compliance checklist:** an engineering checklist for the active code (common items plus ACI or EC2 items such as the
+  National Annex and ρl averaging). Confirmations are ticked by the engineer and saved with the project; automatic checks
+  (inputs valid, DCR ≤ 1, supported case, no warnings) come from the calculation. It is written to the JSON and the Excel
+  Audit sheet.
+- **3D labels:** the _Labels_ button shows or hides the text labels (column, openings, critical stress, design strength,
+  perimeter length, slab thickness).

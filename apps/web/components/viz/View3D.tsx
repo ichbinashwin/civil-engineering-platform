@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { Opening, PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
-import { utilizationRgb } from "@/lib/format";
+import type { Opening, PunchingVizOutcome } from "@civil/shared-types";
+import { formatNumber, utilizationRgb } from "@/lib/format";
 import { hexToNumber } from "@/lib/theme";
 import type { Palette } from "@/lib/theme";
+import type { VizInput } from "@/lib/viz-model";
 import { useTheme } from "../theme/ThemeProvider";
 
 /**
@@ -15,8 +16,8 @@ import { useTheme } from "../theme/ThemeProvider";
  * Coordinates: X, Y in plan (in), Z up; slab occupies 0 ≤ z ≤ h.
  */
 interface View3DProps {
-  input: PunchingShearInput;
-  outcome: PunchingShearOutcome;
+  input: VizInput;
+  outcome: PunchingVizOutcome;
   selectedOpening: string | null;
 }
 
@@ -25,7 +26,18 @@ type Preset = "iso" | "top" | "front" | "side";
 const SLAB_MARGIN_FACTOR = 1.35;
 const FENCE_HEIGHT_FACTOR = 0.32;
 const COLUMN_EXTENSION_FACTOR = 0.5;
+/** Label height as a share of the scene extent. */
+const LABEL_HEIGHT_FACTOR = 0.07;
+/** Camera clipping planes as multiples of the scene extent (the iso camera sits ~4 extents away). */
+const CAMERA_NEAR_FACTOR = 0.01;
+const CAMERA_FAR_FACTOR = 60;
+/** Scene constants below are in inches; multiplied by `unitScale` for millimetre models. */
 const RIBBON_WIDTH_IN = 0.8;
+const MM_PER_IN = 25.4;
+
+function unitScale(input: VizInput): number {
+  return input.lengthUnit === "mm" ? MM_PER_IN : 1;
+}
 
 function finite(...values: number[]): boolean {
   return values.every(Number.isFinite);
@@ -51,8 +63,12 @@ function disposeGroup(group: THREE.Group) {
     const mesh = obj as THREE.Mesh;
     mesh.geometry?.dispose();
     const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-    else mat?.dispose();
+    const disposeMaterial = (m: THREE.Material) => {
+      (m as THREE.SpriteMaterial).map?.dispose();
+      m.dispose();
+    };
+    if (Array.isArray(mat)) mat.forEach(disposeMaterial);
+    else if (mat) disposeMaterial(mat);
   });
   group.clear();
 }
@@ -64,11 +80,12 @@ function ribbon(
   y2: number,
   z: number,
   color: string,
-  width = RIBBON_WIDTH_IN,
+  width: number,
+  thickness: number,
 ) {
   const len = Math.hypot(x2 - x1, y2 - y1);
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(Math.max(len, 0.01), width, 0.25),
+    new THREE.BoxGeometry(Math.max(len, 0.01), width, thickness),
     new THREE.MeshBasicMaterial({ color }),
   );
   mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, z);
@@ -76,21 +93,22 @@ function ribbon(
   return mesh;
 }
 
-function line(points: THREE.Vector3[], color: string, dashed = false) {
+function line(points: THREE.Vector3[], color: string, dashed = false, unit = 1) {
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
   const material = dashed
-    ? new THREE.LineDashedMaterial({ color, dashSize: 2, gapSize: 1.5 })
+    ? new THREE.LineDashedMaterial({ color, dashSize: 2 * unit, gapSize: 1.5 * unit })
     : new THREE.LineBasicMaterial({ color });
   const l = new THREE.Line(geometry, material);
   if (dashed) l.computeLineDistances();
   return l;
 }
 
-function sceneExtent(input: PunchingShearInput): number {
+function sceneExtent(input: VizInput): number {
+  const minimum = 12 * unitScale(input);
   let r = Math.max(
-    finite(input.column.c1) ? input.column.c1 / 2 + (finite(input.d) ? input.d / 2 : 0) : 12,
-    finite(input.column.c2) ? input.column.c2 / 2 + (finite(input.d) ? input.d / 2 : 0) : 12,
-    12,
+    finite(input.column.c1) ? input.column.c1 / 2 + (finite(input.d) ? input.d / 2 : 0) : minimum,
+    finite(input.column.c2) ? input.column.c2 / 2 + (finite(input.d) ? input.d / 2 : 0) : minimum,
+    minimum,
   );
   for (const o of input.openings) {
     if (!openingValid(o)) continue;
@@ -100,21 +118,55 @@ function sceneExtent(input: PunchingShearInput): number {
   return r;
 }
 
+/** Text label as a camera-facing sprite (canvas texture); themed pill, drawn on top of the model. */
+function labelSprite(text: string, palette: Palette, worldHeight: number): THREE.Sprite {
+  const ratio = 2;
+  const fontPx = 28 * ratio;
+  const pad = 10 * ratio;
+  const canvas = document.createElement("canvas");
+  const g = canvas.getContext("2d");
+  if (!g) return new THREE.Sprite();
+  const font = `600 ${fontPx}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  g.font = font;
+  canvas.width = Math.ceil(g.measureText(text).width) + pad * 2;
+  canvas.height = fontPx + pad * 2;
+  g.font = font;
+  g.fillStyle = palette.overlayBg;
+  g.strokeStyle = palette.line;
+  g.lineWidth = 2 * ratio;
+  g.beginPath();
+  g.roundRect(1, 1, canvas.width - 2, canvas.height - 2, 8 * ratio);
+  g.fill();
+  g.stroke();
+  g.fillStyle = palette.ink;
+  g.textBaseline = "middle";
+  g.fillText(text, pad, canvas.height / 2 + ratio);
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true }),
+  );
+  sprite.scale.set((worldHeight * canvas.width) / canvas.height, worldHeight, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
 function buildScene(
   group: THREE.Group,
-  input: PunchingShearInput,
-  outcome: PunchingShearOutcome,
+  input: VizInput,
+  outcome: PunchingVizOutcome,
   opts: {
     xray: boolean;
     fence: boolean;
     tangents: boolean;
+    labels: boolean;
     selectedOpening: string | null;
     palette: Palette;
   },
 ) {
-  const h = finite(input.slabThickness) && input.slabThickness > 0 ? input.slabThickness : 12;
+  const U = unitScale(input);
+  const h = finite(input.slabThickness) && input.slabThickness > 0 ? input.slabThickness : 12 * U;
   const extent = sceneExtent(input);
-  const half = extent * SLAB_MARGIN_FACTOR + 6;
+  const half = extent * SLAB_MARGIN_FACTOR + 6 * U;
 
   // Slab with openings as holes.
   const shape = new THREE.Shape();
@@ -178,7 +230,7 @@ function buildScene(
     if (o.type === "circle") sleeve.rotation.x = Math.PI / 2;
     sleeve.position.set(o.centerX, o.centerY, h / 2);
     group.add(sleeve);
-    for (const z of [0.05, h + 0.05]) {
+    for (const z of [0.05 * U, h + 0.05 * U]) {
       const pts: THREE.Vector3[] = [];
       if (o.type === "circle") {
         for (let k = 0; k <= 48; k++) {
@@ -232,7 +284,7 @@ function buildScene(
   // Ground grid below the column.
   const grid = new THREE.GridHelper(
     half * 2,
-    Math.max(4, Math.round((half * 2) / 12)),
+    Math.max(4, Math.round((half * 2) / (12 * U))),
     hexToNumber(opts.palette.gridMajor),
     hexToNumber(opts.palette.gridMinor),
   );
@@ -240,30 +292,28 @@ function buildScene(
   grid.position.z = -extent * COLUMN_EXTENSION_FACTOR;
   group.add(grid);
 
-  const axes = new THREE.AxesHelper(Math.max(12, extent * 0.35));
-  axes.position.set(-half, -half, h + 0.1);
+  const axes = new THREE.AxesHelper(Math.max(12 * U, extent * 0.35));
+  axes.position.set(-half, -half, h + 0.1 * U);
   group.add(axes);
 
   if (!outcome.ok) return { extent, h };
   const r = outcome;
-  const zTop = h + 0.2;
+  const zTop = h + 0.2 * U;
 
-  // Gross perimeter (thin), ineffective portions (red ribbons).
+  // Gross perimeter (thin; rectangle for ACI, rounded outline for Eurocode), ineffective portions (red ribbons).
   const gx = r.geometry.sizeX / 2;
   const gy = r.geometry.sizeY / 2;
-  group.add(
-    line(
-      [
-        new THREE.Vector3(-gx, -gy, zTop),
-        new THREE.Vector3(gx, -gy, zTop),
-        new THREE.Vector3(gx, gy, zTop),
-        new THREE.Vector3(-gx, gy, zTop),
-        new THREE.Vector3(-gx, -gy, zTop),
-      ],
-      opts.palette.gross,
-      true,
-    ),
-  );
+  const grossLoop = (z: number) =>
+    (
+      r.geometry.grossOutline ?? [
+        { x: -gx, y: -gy },
+        { x: gx, y: -gy },
+        { x: gx, y: gy },
+        { x: -gx, y: gy },
+        { x: -gx, y: -gy },
+      ]
+    ).map((p) => new THREE.Vector3(p.x, p.y, z));
+  group.add(line(grossLoop(zTop), opts.palette.gross, true, U));
   r.geometry.openingShadows.forEach((s) =>
     s.removedSegments.forEach((seg) =>
       group.add(
@@ -272,9 +322,10 @@ function buildScene(
           seg.y1,
           seg.x2,
           seg.y2,
-          zTop + 0.1,
+          zTop + 0.1 * U,
           opts.palette.critical,
-          RIBBON_WIDTH_IN * 1.4,
+          RIBBON_WIDTH_IN * 1.4 * U,
+          0.25 * U,
         ),
       ),
     ),
@@ -282,7 +333,18 @@ function buildScene(
 
   // Effective perimeter ribbons.
   r.geometry.segments.forEach((seg) =>
-    group.add(ribbon(seg.x1, seg.y1, seg.x2, seg.y2, zTop, opts.palette.perimeter)),
+    group.add(
+      ribbon(
+        seg.x1,
+        seg.y1,
+        seg.x2,
+        seg.y2,
+        zTop,
+        opts.palette.perimeter,
+        RIBBON_WIDTH_IN * U,
+        0.25 * U,
+      ),
+    ),
   );
 
   // Tangent lines from the column centroid.
@@ -303,6 +365,7 @@ function buildScene(
             ],
             opts.palette.tangent,
             true,
+            U,
           ),
         );
       }
@@ -351,37 +414,73 @@ function buildScene(
       );
     }
 
-    // φvc reference loop.
-    const zc = zTop + capacity * scale;
-    group.add(
-      line(
-        [
-          new THREE.Vector3(-gx, -gy, zc),
-          new THREE.Vector3(gx, -gy, zc),
-          new THREE.Vector3(gx, gy, zc),
-          new THREE.Vector3(-gx, gy, zc),
-          new THREE.Vector3(-gx, -gy, zc),
-        ],
-        opts.palette.critical,
-        true,
-      ),
-    );
+    // Design-strength reference loop (φvc / vRd,c).
+    group.add(line(grossLoop(zTop + capacity * scale), opts.palette.critical, true, U));
   }
 
   // Critical point and centroid markers.
   const crit = r.demand.criticalPoint;
   const critMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(Math.max(0.8, extent * 0.02), 20, 14),
+    new THREE.SphereGeometry(Math.max(0.8 * U, extent * 0.02), 20, 14),
     new THREE.MeshBasicMaterial({ color: hexToNumber(opts.palette.critical) }),
   );
   critMarker.position.set(crit.x, crit.y, opts.fence ? zTop + crit.stress * scale : zTop);
   group.add(critMarker);
   const centroid = new THREE.Mesh(
-    new THREE.SphereGeometry(Math.max(0.6, extent * 0.015), 16, 12),
+    new THREE.SphereGeometry(Math.max(0.6 * U, extent * 0.015), 16, 12),
     new THREE.MeshBasicMaterial({ color: hexToNumber(opts.palette.centroid) }),
   );
-  centroid.position.set(r.geometry.centroidX, r.geometry.centroidY, zTop + 0.5);
+  centroid.position.set(r.geometry.centroidX, r.geometry.centroidY, zTop + 0.5 * U);
   group.add(centroid);
+
+  // Text labels (toggle): column, openings, critical stress, design strength, perimeter length, thickness.
+  if (opts.labels) {
+    const labelHeight = extent * LABEL_HEIGHT_FACTOR;
+    const unit = input.lengthUnit;
+    const put = (text: string, x: number, y: number, z: number) => {
+      const sprite = labelSprite(text, opts.palette, labelHeight);
+      sprite.position.set(x, y, z);
+      group.add(sprite);
+    };
+    const stressText = (value: number) =>
+      `${formatNumber(value, input.stressDigits)} ${input.stressUnit}`;
+    put(
+      `COLUMN ${formatNumber(c1, 0)} × ${formatNumber(c2, 0)} ${unit}`,
+      0,
+      0,
+      h + extent * COLUMN_EXTENSION_FACTOR + labelHeight,
+    );
+    input.openings.forEach((o, i) => {
+      if (openingValid(o)) put(`O${i + 1}`, o.centerX, o.centerY, h + labelHeight * 0.9);
+    });
+    const critZ = opts.fence ? zTop + crit.stress * scale : zTop;
+    put(
+      `${input.demandLabel} = ${stressText(crit.stress)}`,
+      crit.x,
+      crit.y,
+      critZ + labelHeight * 1.1,
+    );
+    if (opts.fence) {
+      put(
+        `${input.capacityLabel} = ${stressText(capacity)}`,
+        gx,
+        gy,
+        zTop + capacity * scale + labelHeight * 0.9,
+      );
+    }
+    put(
+      `${input.perimeterSymbol} = ${formatNumber(r.geometry.effectivePerimeter, input.lengthUnit === "mm" ? 0 : 1)} ${unit}`,
+      0,
+      -gy - labelHeight * 0.8,
+      zTop + labelHeight * 0.6,
+    );
+    put(
+      `h = ${formatNumber(h, input.lengthUnit === "mm" ? 0 : 1)} ${unit}`,
+      half + labelHeight,
+      0,
+      h / 2,
+    );
+  }
 
   return { extent, h };
 }
@@ -401,11 +500,13 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
   const prefersReducedMotion =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  const [spin, setSpin] = useState(false);
+  // Spin is on by default (off only when the system asks for reduced motion).
+  const [spin, setSpin] = useState(!prefersReducedMotion);
   const [speed, setSpeed] = useState(1.5);
   const [xray, setXray] = useState(true);
   const [fence, setFence] = useState(true);
   const [tangents, setTangents] = useState(true);
+  const [labels, setLabels] = useState(true);
   const [preset, setPreset] = useState<{ name: Preset; n: number }>({ name: "iso", n: 0 });
   const extentRef = useRef({ extent: 40, h: 18 });
 
@@ -428,7 +529,7 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
     renderer.domElement.setAttribute("role", "img");
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 5000);
+    const camera = new THREE.PerspectiveCamera(40, 1, 1, 1000);
     camera.up.set(0, 0, 1);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -479,11 +580,18 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
       xray,
       fence,
       tangents,
+      labels,
       selectedOpening,
       palette,
     });
     c.renderer.setClearColor(hexToNumber(palette.canvas));
-  }, [input, outcome, xray, fence, tangents, selectedOpening, palette]);
+    // Clipping planes follow the model size: a millimetre model (EU) is ~25x larger in scene units than
+    // an inch model (US), and fixed planes would cut it off.
+    const { extent } = extentRef.current;
+    c.camera.near = extent * CAMERA_NEAR_FACTOR;
+    c.camera.far = extent * CAMERA_FAR_FACTOR;
+    c.camera.updateProjectionMatrix();
+  }, [input, outcome, xray, fence, tangents, labels, selectedOpening, palette]);
 
   // Camera presets (also initial fit).
   useEffect(() => {
@@ -569,6 +677,15 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
           >
             Tangents
           </button>
+          <button
+            type="button"
+            className="btn small"
+            aria-pressed={labels}
+            onClick={() => setLabels((v) => !v)}
+            title="Show or hide the text labels in the 3D view"
+          >
+            Labels
+          </button>
         </div>
         <span className="small">Drag to orbit · right-drag to pan · scroll to zoom</span>
       </div>
@@ -580,10 +697,12 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
         )}
         <div className="overlay legend3d" aria-hidden="true">
           <div>
-            <i className="ramp" /> vu / φvc
+            <i className="ramp" /> {input.demandLabel} / {input.capacityLabel}
           </div>
-          <div>Fence height ∝ vu · red dashed = φvc</div>
-          <div>Blue = effective bo · red = ineffective</div>
+          <div>
+            Fence height ∝ {input.demandLabel} · red dashed = {input.capacityLabel}
+          </div>
+          <div>Blue = effective {input.perimeterSymbol} · red = ineffective</div>
           {prefersReducedMotion && <div>Reduced motion: spin off by default</div>}
         </div>
       </div>

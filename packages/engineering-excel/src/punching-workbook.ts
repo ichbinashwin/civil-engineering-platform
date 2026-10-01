@@ -2,6 +2,8 @@ import ExcelJS from "exceljs";
 import type { Worksheet } from "exceljs";
 import type { PunchingShearInput, PunchingShearResult } from "@civil/shared-types";
 import { ACI318_19, convertForce, convertMoment } from "@civil/engineering-core";
+import { writeChecklistSection } from "./audit-checklist";
+import type { AuditChecklistItem } from "./audit-checklist";
 import {
   BORDER_ALL,
   NUMBER_FORMATS,
@@ -25,6 +27,8 @@ import {
  * are engine values (not reproducible with simple worksheet formulas) and are labeled as such.
  */
 export interface PunchingWorkbookParams {
+  /** Engineering compliance checklist written to the Audit sheet (optional). */
+  checklist?: AuditChecklistItem[];
   project: { name: string; member: string; engineer: string; revision: string };
   input: PunchingShearInput;
   result: PunchingShearResult;
@@ -43,12 +47,12 @@ export const SHEET_NAMES = {
 
 const KIP_TO_LB = convertForce(1, "kip", "lb");
 const KIPFT_TO_LBIN = convertMoment(1, "kip-ft", "lb-in");
-const JSON_CHUNK = 30000;
+export const JSON_CHUNK = 30000;
 const TWS = ACI318_19.twoWayShear;
 
-type CellRefs = Map<string, string>;
+export type CellRefs = Map<string, string>;
 
-function absRef(sheet: string, row: number, col: number): string {
+export function absRef(sheet: string, row: number, col: number): string {
   let letters = "";
   let n = col;
   while (n > 0) {
@@ -60,12 +64,12 @@ function absRef(sheet: string, row: number, col: number): string {
   return `${quoted}!$${letters}$${row}`;
 }
 
-function setColumns(ws: Worksheet, widths: number[]) {
+export function setColumns(ws: Worksheet, widths: number[]) {
   ws.columns = widths.map((width) => ({ width }));
 }
 
 /** Calculation-sheet columns: Parameter | Symbol | Excel formula | Engine value | Δ | Unit | Reference. */
-const CALC_COLUMNS = [
+export const CALC_COLUMNS = [
   "Parameter",
   "Symbol",
   "Excel (formula)",
@@ -75,7 +79,7 @@ const CALC_COLUMNS = [
   "ACI 318-19",
 ];
 
-interface CalcRow {
+export interface CalcRow {
   key: string;
   label: string;
   symbol: string;
@@ -88,7 +92,7 @@ interface CalcRow {
   emphasize?: boolean;
 }
 
-function resolveFormula(formula: string, refs: CellRefs): string {
+export function resolveFormula(formula: string, refs: CellRefs): string {
   return formula.replace(/\{(\w+)\}/g, (_, key: string) => {
     const r = refs.get(key);
     if (!r) throw new Error(`Excel export: unknown reference {${key}}`);
@@ -96,7 +100,12 @@ function resolveFormula(formula: string, refs: CellRefs): string {
   });
 }
 
-function writeCalcTable(ws: Worksheet, startRow: number, rows: CalcRow[], refs: CellRefs): number {
+export function writeCalcTable(
+  ws: Worksheet,
+  startRow: number,
+  rows: CalcRow[],
+  refs: CellRefs,
+): number {
   const header = ws.getRow(startRow);
   header.values = CALC_COLUMNS;
   headerRow(header);
@@ -152,7 +161,7 @@ function writeCalcTable(ws: Worksheet, startRow: number, rows: CalcRow[], refs: 
   return r;
 }
 
-function noteRow(ws: Worksheet, row: number, text: string, columns: number) {
+export function noteRow(ws: Worksheet, row: number, text: string, columns: number) {
   ws.mergeCells(row, 1, row, columns);
   const c = ws.getCell(row, 1);
   c.value = text;
@@ -161,7 +170,7 @@ function noteRow(ws: Worksheet, row: number, text: string, columns: number) {
   ws.getRow(row).height = 30;
 }
 
-function prepareSheet(ws: Worksheet, landscape = false) {
+export function prepareSheet(ws: Worksheet, landscape = false) {
   ws.pageSetup = {
     paperSize: 9,
     orientation: landscape ? "landscape" : "portrait",
@@ -1028,6 +1037,8 @@ function buildAudit(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, exportedAt:
     [1, 2, 3].forEach((c) => bodyCell(ws.getCell(r, c)));
     r += 1;
   }
+
+  r = writeChecklistSection(ws, r + 1, p.checklist);
 
   r += 1;
   sectionHeading(ws, r, "Input snapshot (canonical units: lb, in, lb-in, psi) — JSON", 3);

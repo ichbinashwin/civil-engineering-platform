@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import type { PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
+import type { PunchingVizOutcome } from "@civil/shared-types";
+import type { VizInput } from "@/lib/viz-model";
 import { Pane } from "../layout/Pane";
 import { PlanView } from "./PlanView";
 
@@ -14,8 +15,8 @@ const View3D = dynamic(() => import("./View3D").then((m) => m.View3D), {
 type Tab = "plan" | "3d";
 
 interface VisualizationPanelProps {
-  input: PunchingShearInput;
-  outcome: PunchingShearOutcome;
+  input: VizInput;
+  outcome: PunchingVizOutcome;
   selectedOpening: string | null;
   onSelectOpening: (key: string | null) => void;
 }
@@ -48,9 +49,10 @@ export function VisualizationPanel(props: VisualizationPanelProps) {
     >
       <div role="tabpanel">
         {tab === "plan" ? (
-          <PlanView {...props} />
+          <PlanView key={props.input.lengthUnit} {...props} />
         ) : (
           <View3D
+            key={props.input.lengthUnit}
             input={props.input}
             outcome={props.outcome}
             selectedOpening={props.selectedOpening}

@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { PunchingShearOutcome } from "@civil/shared-types";
+import type { PunchingShearOutcome, PunchingShearOutcomeEC2 } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
 import { Pane } from "../layout/Pane";
 
@@ -15,7 +15,7 @@ export interface ReviewRecord {
 }
 
 interface ReviewPanelProps {
-  outcome: PunchingShearOutcome;
+  outcome: PunchingShearOutcome | PunchingShearOutcomeEC2;
   inputSignature: string;
   review: ReviewRecord | null;
   onReview: (record: ReviewRecord | null) => void;

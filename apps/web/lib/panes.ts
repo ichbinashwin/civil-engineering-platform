@@ -10,6 +10,7 @@ export const PANE_IDS = [
   "trace",
   "result",
   "review",
+  "compliance",
   "messages",
   "refs",
 ] as const;
@@ -17,7 +18,16 @@ export const PANE_IDS = [
 export type PaneId = (typeof PANE_IDS)[number];
 
 export type PaneIconName =
-  "sliders" | "chart" | "cube" | "table" | "list" | "check" | "clipboard" | "alert" | "book";
+  | "sliders"
+  | "chart"
+  | "cube"
+  | "table"
+  | "list"
+  | "check"
+  | "clipboard"
+  | "alert"
+  | "book"
+  | "shield";
 
 export type DockSide = "left" | "right";
 
@@ -49,6 +59,7 @@ export const PANES: Record<PaneId, PaneDefinition> = {
   },
   result: { title: "Result", side: "right", icon: "check", flyoutWidth: 420 },
   review: { title: "Engineer review", side: "right", icon: "clipboard", flyoutWidth: 420 },
+  compliance: { title: "Compliance checklist", side: "right", icon: "shield", flyoutWidth: 500 },
   messages: { title: "Engineering messages", side: "right", icon: "alert", flyoutWidth: 460 },
   refs: { title: "Code references", side: "right", icon: "book", flyoutWidth: 460 },
 };

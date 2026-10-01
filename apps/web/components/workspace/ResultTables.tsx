@@ -1,4 +1,4 @@
-import type { PunchingShearResult } from "@civil/shared-types";
+import type { PunchingShearResult, PunchingShearResultEC2 } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
 import { Pane } from "../layout/Pane";
 
@@ -117,6 +117,94 @@ export function ResultTables({ result }: { result: PunchingShearResult }) {
             ACI 318-19 Concrete Shear Strength
           </h3>
           <Table caption="Concrete shear strength" rows={capacityRows} />
+        </section>
+      </div>
+    </Pane>
+  );
+}
+
+/** EN 1992-1-1 tables: control perimeter, demand (β, vEd) and resistance (vRd,c, vmin, vRd,max). */
+export function ResultTablesEC2({ result }: { result: PunchingShearResultEC2 }) {
+  const { geometry: g, demand: dm, capacity: c } = result;
+  const removed = g.grossPerimeter - g.effectivePerimeter;
+  const geometryRows: Row[] = [
+    ["Control size by = c1 + 4d", formatNumber(g.sizeX, 1), "mm", "6.4.2(1)"],
+    ["Control size bz = c2 + 4d", formatNumber(g.sizeY, 1), "mm", "6.4.2(1)"],
+    ["Gross control perimeter u1", formatNumber(g.grossPerimeter, 1), "mm", "6.4.2(1)"],
+    ...g.openingReductions.map((o): Row => [
+      `Opening ${o.openingIndex + 1} ${o.applied ? "removed" : "(beyond 6d, ignored)"}`,
+      formatNumber(o.reduction, 1),
+      "mm",
+      "6.4.2(3)",
+    ]),
+    ["Effective perimeter u1", formatNumber(g.effectivePerimeter, 1), "mm", "6.4.2(3)", true],
+    ["Perimeter reduction", formatNumber((removed / g.grossPerimeter) * 100, 2), "%", ""],
+    ["Column perimeter u0", formatNumber(g.columnPerimeter, 1), "mm", "6.4.5(3)"],
+    ["Centroid x̄", formatNumber(g.centroidX, 2), "mm", ""],
+    ["Centroid ȳ", formatNumber(g.centroidY, 2), "mm", ""],
+    ["W1 about X (for MEdx)", formatNumber(g.W1x, 0), "mm²", "(6.40)"],
+    ["W1 about Y (for MEdy)", formatNumber(g.W1y, 0), "mm²", "(6.40)"],
+  ];
+  const demandRows: Row[] = [
+    ["Eccentricity eY = MEdx/VEd", formatNumber(dm.eccentricityY, 2), "mm", "6.4.3(3)"],
+    ["Eccentricity eX = MEdy/VEd", formatNumber(dm.eccentricityX, 2), "mm", "6.4.3(3)"],
+    ["β method", dm.betaMethod === "concentric" ? "β = 1.0" : `(${dm.betaMethod})`, "", "6.4.3(3)"],
+    ["β", formatNumber(dm.beta, 4), "—", "6.4.3(3)"],
+    ["vEd at u1", formatNumber(dm.directShear, 3), "MPa", "(6.38)", true],
+    ["vEd,0 at u0", formatNumber(dm.columnFaceShear, 3), "MPa", "6.4.5(3)"],
+  ];
+  const capacityRows: Row[] = [
+    ["k = 1 + √(200/d) ≤ 2.0", formatNumber(c.k, 4), "—", "6.4.4(1)"],
+    ["ρl = √(ρlx ρly) ≤ 0.02", formatNumber(c.rhoL, 5), "—", "6.4.4(1)"],
+    ["CRd,c = 0.18/γc", formatNumber(c.cRdc, 4), "—", "6.4.4(1)"],
+    [
+      "CRd,c k (100 ρl fck)^⅓",
+      formatNumber(c.vRdcFormula, 3),
+      "MPa",
+      "(6.47)",
+      c.governingExpression === "6.47",
+    ],
+    [
+      "vmin = 0.035 k^(3/2) fck^(1/2)",
+      formatNumber(c.vMin, 3),
+      "MPa",
+      "(6.3N)",
+      c.governingExpression === "6.3N",
+    ],
+    ["vRd,c", formatNumber(c.vRdc, 3), "MPa", "(6.47)", true],
+    ["ν = 0.6 (1 − fck/250)", formatNumber(c.nu, 4), "—", "(6.6N)"],
+    ["fcd = αcc fck/γc", formatNumber(c.fcd, 2), "MPa", "(3.15)"],
+    ["vRd,max = 0.4 ν fcd", formatNumber(c.vRdMax, 3), "MPa", "6.4.5(3)", true],
+    ["vEd / vRd,c at u1", formatNumber(result.dcrAtControlPerimeter, 3), "—", "6.4.3(2)"],
+    ["vEd,0 / vRd,max at column", formatNumber(result.dcrAtColumnFace, 3), "—", "6.4.3(2)"],
+  ];
+  return (
+    <Pane
+      id="tables"
+      badge={
+        <span className="badge info">
+          {g.openingReductions.filter((o) => o.applied).length} opening(s) within 6d
+        </span>
+      }
+    >
+      <section aria-labelledby="geo-h" style={{ marginBottom: 18 }}>
+        <h3 id="geo-h" className="section-title">
+          Basic Control Perimeter
+        </h3>
+        <Table caption="Basic control perimeter" rows={geometryRows} />
+      </section>
+      <div className="tables">
+        <section aria-labelledby="dem-h">
+          <h3 id="dem-h" className="section-title">
+            Punching Shear Demand
+          </h3>
+          <Table caption="Punching shear demand" rows={demandRows} />
+        </section>
+        <section aria-labelledby="cap-h">
+          <h3 id="cap-h" className="section-title">
+            EN 1992-1-1 Shear Resistance
+          </h3>
+          <Table caption="Shear resistance" rows={capacityRows} />
         </section>
       </div>
     </Pane>

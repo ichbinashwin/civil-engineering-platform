@@ -1,6 +1,7 @@
 import { useId } from "react";
 import type { CalculationWarning } from "@civil/shared-types";
-import { createOpening } from "@/lib/form";
+import { UNIT_SYSTEMS, createOpening } from "@/lib/form";
+import { CODE_LABELS } from "@/lib/calc";
 import type { FormState, NumericField, OpeningForm } from "@/lib/form";
 import { Pane } from "../layout/Pane";
 import { NumberField } from "./NumberField";
@@ -13,18 +14,41 @@ interface InputPanelProps {
   onSelectOpening: (key: string | null) => void;
 }
 
-const ACTIONS: { field: NumericField; label: string; unit: string }[] = [
-  { field: "Vu", label: "Vu (factored shear)", unit: "kip" },
-  { field: "Mux", label: "Mux (about X)", unit: "kip-ft" },
-  { field: "Muy", label: "Muy (about Y)", unit: "kip-ft" },
-];
+interface FieldDef {
+  field: NumericField;
+  label: string;
+  unit: string;
+}
 
-const GEOMETRY: { field: NumericField; label: string; unit: string }[] = [
-  { field: "c1", label: "c1 (column, X)", unit: "in" },
-  { field: "c2", label: "c2 (column, Y)", unit: "in" },
-  { field: "d", label: "Effective depth d", unit: "in" },
-  { field: "h", label: "Slab thickness h", unit: "in" },
-];
+/** Field labels and units follow the selected design code (US: kip, kip-ft, in / EU: kN, kN·m, mm). */
+function actionFields(form: FormState): FieldDef[] {
+  const u = UNIT_SYSTEMS[form.code];
+  return form.code === "EN 1992-1-1"
+    ? [
+        { field: "Vu", label: "VEd (design shear)", unit: u.force },
+        { field: "Mux", label: "MEdx (about X)", unit: u.momentLabel },
+        { field: "Muy", label: "MEdy (about Y)", unit: u.momentLabel },
+      ]
+    : [
+        { field: "Vu", label: "Vu (factored shear)", unit: u.force },
+        { field: "Mux", label: "Mux (about X)", unit: u.momentLabel },
+        { field: "Muy", label: "Muy (about Y)", unit: u.momentLabel },
+      ];
+}
+
+function geometryFields(form: FormState): FieldDef[] {
+  const unit = UNIT_SYSTEMS[form.code].length;
+  return [
+    { field: "c1", label: "c1 (column, X)", unit },
+    { field: "c2", label: "c2 (column, Y)", unit },
+    {
+      field: "d",
+      label: form.code === "EN 1992-1-1" ? "Mean effective depth d" : "Effective depth d",
+      unit,
+    },
+    { field: "h", label: "Slab thickness h", unit },
+  ];
+}
 
 export function InputPanel({
   form,
@@ -42,6 +66,8 @@ export function InputPanel({
     reinf: useId(),
     sign: useId(),
   };
+  const units = UNIT_SYSTEMS[form.code];
+  const isEc2 = form.code === "EN 1992-1-1";
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ ...form, [key]: value });
   const setOpening = (key: string, patch: Partial<OpeningForm>) =>
@@ -106,25 +132,39 @@ export function InputPanel({
           <div className="row wide">
             <span className="field-label">Design code</span>
             <span className="unit" style={{ textAlign: "right" }}>
-              ACI 318-19 (US units)
+              {CODE_LABELS[form.code].short} ({CODE_LABELS[form.code].region} · {units.force},{" "}
+              {units.length})
             </span>
           </div>
         </fieldset>
 
         <fieldset className="group">
           <legend className="group-title">Factored actions</legend>
-          {ACTIONS.map((a) => field(a.field, a.label, a.unit))}
+          {actionFields(form).map((a) => field(a.field, a.label, a.unit))}
         </fieldset>
 
         <fieldset className="group">
           <legend className="group-title">Column / slab geometry</legend>
-          {GEOMETRY.map((g) => field(g.field, g.label, g.unit))}
+          {geometryFields(form).map((g) => field(g.field, g.label, g.unit))}
         </fieldset>
 
         <fieldset className="group">
           <legend className="group-title">Material</legend>
-          {field("fc", "f'c", "psi", "250")}
-          {field("lambda", "λ (lightweight factor)", "—", "0.05")}
+          {isEc2 ? (
+            <>
+              {field("fc", "fck (cylinder strength)", "MPa", "5")}
+              {field("rhoX", "ρlx (tension steel, X)", "%", "0.05")}
+              {field("rhoY", "ρly (tension steel, Y)", "%", "0.05")}
+              <p className="small" style={{ margin: "4px 0 0" }}>
+                ρl: mean ratio over the column width + 3d each side (§6.4.4(1)).
+              </p>
+            </>
+          ) : (
+            <>
+              {field("fc", "f'c", "psi", "250")}
+              {field("lambda", "λ (lightweight factor)", "—", "0.05")}
+            </>
+          )}
         </fieldset>
 
         <fieldset className="group">
@@ -133,7 +173,7 @@ export function InputPanel({
             <button
               type="button"
               className="btn small"
-              onClick={() => set("openings", [...form.openings, createOpening()])}
+              onClick={() => set("openings", [...form.openings, createOpening(form.code)])}
             >
               + Add opening
             </button>
@@ -183,14 +223,14 @@ export function InputPanel({
                 </div>
                 <NumberField
                   label="Center X"
-                  unit="in"
+                  unit={units.length}
                   value={o.x}
                   onChange={(v) => setOpening(o.key, { x: v })}
                   messages={msg("x")}
                 />
                 <NumberField
                   label="Center Y"
-                  unit="in"
+                  unit={units.length}
                   value={o.y}
                   onChange={(v) => setOpening(o.key, { y: v })}
                   messages={msg("y")}
@@ -198,7 +238,7 @@ export function InputPanel({
                 {o.type === "circle" ? (
                   <NumberField
                     label="Diameter"
-                    unit="in"
+                    unit={units.length}
                     value={o.diameter}
                     onChange={(v) => setOpening(o.key, { diameter: v })}
                     messages={msg("diameter")}
@@ -207,14 +247,14 @@ export function InputPanel({
                   <>
                     <NumberField
                       label="Width (X)"
-                      unit="in"
+                      unit={units.length}
                       value={o.width}
                       onChange={(v) => setOpening(o.key, { width: v })}
                       messages={msg("width")}
                     />
                     <NumberField
                       label="Height (Y)"
-                      unit="in"
+                      unit={units.length}
                       value={o.height}
                       onChange={(v) => setOpening(o.key, { height: v })}
                       messages={msg("height")}
@@ -262,34 +302,43 @@ export function InputPanel({
               <option value="stirrups">Stirrups (not implemented)</option>
             </select>
           </div>
-          <div className="row wide">
-            <label
-              htmlFor={ids.sign}
-              title="Envelope: worst sign of each moment (conservative). Signed: positive Mux raises stress on +y, positive Muy on +x."
-            >
-              Moment signs
-            </label>
-            <select
-              id={ids.sign}
-              className="input"
-              value={form.momentSign}
-              onChange={(e) => set("momentSign", e.target.value as FormState["momentSign"])}
-            >
-              <option value="envelope">Envelope (conservative)</option>
-              <option value="signed">Signed (as entered)</option>
-            </select>
-          </div>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={form.applySizeEffect}
-              onChange={(e) => set("applySizeEffect", e.target.checked)}
-            />
-            <span>
-              Apply size-effect factor λs (§22.5.5.1.3). Unchecking reproduces legacy calculations
-              and is flagged as non-conforming.
-            </span>
-          </label>
+          {isEc2 ? (
+            <p className="small" style={{ margin: "4px 0 0" }}>
+              EN 1992-1-1: β is a magnitude (moment signs do not matter); recommended National Annex
+              values; σcp = 0.
+            </p>
+          ) : (
+            <>
+              <div className="row wide">
+                <label
+                  htmlFor={ids.sign}
+                  title="Envelope: worst sign of each moment (conservative). Signed: positive Mux raises stress on +y, positive Muy on +x."
+                >
+                  Moment signs
+                </label>
+                <select
+                  id={ids.sign}
+                  className="input"
+                  value={form.momentSign}
+                  onChange={(e) => set("momentSign", e.target.value as FormState["momentSign"])}
+                >
+                  <option value="envelope">Envelope (conservative)</option>
+                  <option value="signed">Signed (as entered)</option>
+                </select>
+              </div>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={form.applySizeEffect}
+                  onChange={(e) => set("applySizeEffect", e.target.checked)}
+                />
+                <span>
+                  Apply size-effect factor λs (§22.5.5.1.3). Unchecking reproduces legacy
+                  calculations and is flagged as non-conforming.
+                </span>
+              </label>
+            </>
+          )}
         </fieldset>
 
         <div className="note">

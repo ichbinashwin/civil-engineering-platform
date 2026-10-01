@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Opening, PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
-import { convertForce, convertMoment } from "@civil/engineering-core";
+import type { Opening, PunchingVizOutcome } from "@civil/shared-types";
 import { formatNumber, utilizationColor } from "@/lib/format";
 import type { Palette } from "@/lib/theme";
+import type { VizInput } from "@/lib/viz-model";
 import { useTheme } from "../theme/ThemeProvider";
 
 /**
@@ -13,8 +13,8 @@ import { useTheme } from "../theme/ThemeProvider";
  * critical point and stress utilization along bo. Supports zoom, pan, fit, grid and inspection.
  */
 interface PlanViewProps {
-  input: PunchingShearInput;
-  outcome: PunchingShearOutcome;
+  input: VizInput;
+  outcome: PunchingVizOutcome;
   selectedOpening: string | null;
   onSelectOpening: (key: string | null) => void;
 }
@@ -27,7 +27,12 @@ interface View {
   cy: number;
 }
 
-const GRID_STEPS_IN = [1, 2, 3, 6, 12, 24, 48, 96];
+/** Grid spacings in display units: inches (US) or millimetres (EU). */
+const GRID_STEPS = {
+  in: [1, 2, 3, 6, 12, 24, 48, 96],
+  mm: [25, 50, 100, 200, 500, 1000, 2000, 5000],
+} as const;
+const MM_PER_IN = 25.4;
 const MIN_GRID_PX = 28;
 const FIT_PADDING = 1.25;
 const ZOOM_STEP = 1.25;
@@ -59,9 +64,10 @@ function openingExtent(o: Opening): { hx: number; hy: number } {
     : { hx: o.width / 2, hy: o.height / 2 };
 }
 
-function sceneBounds(input: PunchingShearInput, outcome: PunchingShearOutcome) {
-  let maxX = 12;
-  let maxY = 12;
+function sceneBounds(input: VizInput, outcome: PunchingVizOutcome) {
+  const minimum = 12 * (input.lengthUnit === "mm" ? MM_PER_IN : 1);
+  let maxX = minimum;
+  let maxY = minimum;
   const grow = (x: number, y: number) => {
     if (finite(x, y)) {
       maxX = Math.max(maxX, Math.abs(x));
@@ -164,7 +170,9 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
   const openingKeys = input.openings.map((o, i) => o.id ?? `index-${i}`);
 
   // Grid
-  const gridStep = GRID_STEPS_IN.find((s) => s * view.k >= MIN_GRID_PX) ?? 96;
+  const gridSteps = GRID_STEPS[input.lengthUnit];
+  const gridStep =
+    gridSteps.find((s) => s * view.k >= MIN_GRID_PX) ?? gridSteps[gridSteps.length - 1] ?? 1;
   const gridLines: React.ReactNode[] = [];
   if (showGrid) {
     const x0 = view.cx - size.w / 2 / view.k;
@@ -333,18 +341,26 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               });
             })}
 
-          {/* Gross critical perimeter */}
-          {result && (
-            <rect
-              x={sx(-result.geometry.sizeX / 2)}
-              y={sy(result.geometry.sizeY / 2)}
-              width={result.geometry.sizeX * view.k}
-              height={result.geometry.sizeY * view.k}
-              fill="none"
-              stroke={COLORS.gross}
-              strokeDasharray="3 3"
-            />
-          )}
+          {/* Gross critical perimeter (rectangle for ACI, rounded outline for Eurocode) */}
+          {result &&
+            (result.geometry.grossOutline ? (
+              <polygon
+                points={result.geometry.grossOutline.map((p) => `${sx(p.x)},${sy(p.y)}`).join(" ")}
+                fill="none"
+                stroke={COLORS.gross}
+                strokeDasharray="3 3"
+              />
+            ) : (
+              <rect
+                x={sx(-result.geometry.sizeX / 2)}
+                y={sy(result.geometry.sizeY / 2)}
+                width={result.geometry.sizeX * view.k}
+                height={result.geometry.sizeY * view.k}
+                fill="none"
+                stroke={COLORS.gross}
+                strokeDasharray="3 3"
+              />
+            ))}
 
           {/* Column */}
           {columnValid && (
@@ -515,7 +531,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                 markerEnd="url(#dim)"
               />
               <text x={sx(0)} y={sy(-result.geometry.sizeY / 2) + 30} textAnchor="middle">
-                c1 + d = {formatNumber(result.geometry.sizeX, 2)} in
+                {input.dimXLabel} = {formatNumber(result.geometry.sizeX, 2)} {input.lengthUnit}
               </text>
               <line
                 y1={sy(result.geometry.sizeY / 2)}
@@ -532,7 +548,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                 textAnchor="middle"
                 transform={`rotate(-90 ${sx(result.geometry.sizeX / 2) + 30} ${sy(0)})`}
               >
-                c2 + d = {formatNumber(result.geometry.sizeY, 2)} in
+                {input.dimYLabel} = {formatNumber(result.geometry.sizeY, 2)} {input.lengthUnit}
               </text>
             </g>
           )}
@@ -585,7 +601,9 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                 fill={P.critical}
                 fontWeight={700}
               >
-                vu,max = {formatNumber(result.demand.maximumShearStress, 1)} psi
+                {input.demandLabel} ={" "}
+                {formatNumber(result.demand.maximumShearStress, input.stressDigits)}{" "}
+                {input.stressUnit}
               </text>
             </g>
           )}
@@ -611,7 +629,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               markerEnd="url(#dbl)"
             />
             <text x={50} y={4}>
-              Mux {formatNumber(convertMoment(input.Mux, "lb-in", "kip-ft"), 1)}
+              Mux {input.momentXValue}
             </text>
             <line
               x1={0}
@@ -623,13 +641,13 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               markerEnd="url(#dbl)"
             />
             <text x={6} y={-18}>
-              Muy {formatNumber(convertMoment(input.Muy, "lb-in", "kip-ft"), 1)}
+              Muy {input.momentYValue}
             </text>
             <text x={0} y={22} fill={P.muted}>
-              kip-ft · vectors
+              {input.momentUnit} · vectors
             </text>
             <text x={0} y={36} fill={P.muted}>
-              Vu {formatNumber(convertForce(input.Vu, "lb", "kip"), 1)} kip ⊗
+              V {input.forceValue} {input.forceUnit} ⊗
             </text>
           </g>
 
@@ -658,7 +676,8 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
 
         {hover && (
           <div className="overlay coords" aria-hidden="true">
-            x {formatNumber(hover.x, 2)} in · y {formatNumber(hover.y, 2)} in · grid {gridStep} in
+            x {formatNumber(hover.x, 2)} {input.lengthUnit} · y {formatNumber(hover.y, 2)}{" "}
+            {input.lengthUnit} · grid {gridStep} {input.lengthUnit}
           </div>
         )}
 
@@ -670,23 +689,10 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
           >
             <strong>Critical perimeter</strong>
             <dl className="kv">
-              <dt>bo (effective)</dt>
-              <dd>{formatNumber(result.geometry.effectivePerimeter, 3)} in</dd>
-              <dt>centroid</dt>
-              <dd>
-                ({formatNumber(result.geometry.centroidX, 3)},{" "}
-                {formatNumber(result.geometry.centroidY, 3)})
-              </dd>
-              <dt>Ix</dt>
-              <dd>{formatNumber(result.geometry.Ix, 0)} in³</dd>
-              <dt>Iy</dt>
-              <dd>{formatNumber(result.geometry.Iy, 0)} in³</dd>
-              <dt>Jx</dt>
-              <dd>{formatNumber(result.geometry.Jx, 0)} in⁴</dd>
-              <dt>Jy</dt>
-              <dd>{formatNumber(result.geometry.Jy, 0)} in⁴</dd>
-              <dt>Jxy</dt>
-              <dd>{formatNumber(result.geometry.Jxy, 1)} in⁴</dd>
+              {input.perimeterRows.flatMap((row) => [
+                <dt key={`${row.label}-t`}>{row.label}</dt>,
+                <dd key={`${row.label}-d`}>{row.value}</dd>,
+              ])}
             </dl>
             <button
               type="button"
@@ -712,19 +718,21 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               <dt>Center</dt>
               <dd>
                 ({formatNumber(selectedOpeningData.centerX, 2)},{" "}
-                {formatNumber(selectedOpeningData.centerY, 2)}) in
+                {formatNumber(selectedOpeningData.centerY, 2)}) {input.lengthUnit}
               </dd>
               {selectedOpeningData.type === "circle" ? (
                 <>
                   <dt>Diameter</dt>
-                  <dd>{formatNumber(selectedOpeningData.diameter, 2)} in</dd>
+                  <dd>
+                    {formatNumber(selectedOpeningData.diameter, 2)} {input.lengthUnit}
+                  </dd>
                 </>
               ) : (
                 <>
                   <dt>Width × height</dt>
                   <dd>
                     {formatNumber(selectedOpeningData.width, 2)} ×{" "}
-                    {formatNumber(selectedOpeningData.height, 2)} in
+                    {formatNumber(selectedOpeningData.height, 2)} {input.lengthUnit}
                   </dd>
                 </>
               )}
@@ -734,11 +742,13 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                   Math.hypot(selectedOpeningData.centerX, selectedOpeningData.centerY),
                   2,
                 )}{" "}
-                in
+                {input.lengthUnit}
               </dd>
-              <dt>bo removed</dt>
+              <dt>{input.perimeterSymbol} removed</dt>
               <dd>
-                {selectedReduction ? `${formatNumber(selectedReduction.reduction, 3)} in` : "—"}
+                {selectedReduction
+                  ? `${formatNumber(selectedReduction.reduction, 3)} ${input.lengthUnit}`
+                  : "—"}
               </dd>
             </dl>
             <button

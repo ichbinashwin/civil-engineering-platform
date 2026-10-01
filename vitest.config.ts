@@ -11,6 +11,8 @@ export default defineConfig({
     include: ["tests/{unit,integration,regression}/**/*.test.{ts,tsx}"],
     environment: "node",
     setupFiles: ["tests/setup.ts"],
+    // Component tests mount the whole workspace in jsdom; allow for slow or busy CI machines.
+    testTimeout: 30_000,
     passWithNoTests: false,
   },
 });

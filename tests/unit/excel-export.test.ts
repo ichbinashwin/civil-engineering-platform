@@ -1,8 +1,20 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { calculatePunchingShear } from "@civil/engineering-core";
-import { SHEET_NAMES, exportPunchingWorkbook, safeText } from "@civil/engineering-excel";
-import type { PunchingShearInput, PunchingShearResult } from "@civil/shared-types";
+import { calculatePunchingShear, calculatePunchingShearEC2 } from "@civil/engineering-core";
+import {
+  SHEET_NAMES,
+  SHEET_NAMES_EC2,
+  exportPunchingWorkbook,
+  exportPunchingWorkbookEC2,
+  safeText,
+} from "@civil/engineering-excel";
+import type { AuditChecklistItem } from "@civil/engineering-excel";
+import type {
+  PunchingShearInput,
+  PunchingShearInputEC2,
+  PunchingShearResult,
+  PunchingShearResultEC2,
+} from "@civil/shared-types";
 import { REFERENCE_CASE, referenceWith } from "../fixtures/punching-reference";
 
 const PROJECT = {
@@ -61,6 +73,8 @@ function evaluator(wb: ExcelJS.Workbook) {
         (_m, col: string, row: string) =>
           `(${JSON.stringify(valueOf(currentSheet, `${col}${row}`))})`,
       )
+      .replace(/\bPI\(\)/g, "Math.PI")
+      .replace(/\^/g, "**")
       .replace(/\bSQRT\(/g, "Math.sqrt(")
       .replace(/\bMIN\(/g, "Math.min(")
       .replace(/\bMAX\(/g, "Math.max(")
@@ -141,5 +155,121 @@ describe("formatted Excel export", () => {
     audit.eachRow((row) => row.eachCell((c) => text.push(String(c.value))));
     expect(text).toContain(r.meta.engineVersion);
     expect(text.join("")).toContain(JSON.stringify(REFERENCE_CASE).slice(0, 40));
+  });
+});
+
+const CHECKLIST: AuditChecklistItem[] = [
+  { section: "Automatic", label: "Inputs valid", checked: true, automatic: true },
+  {
+    section: "Common",
+    label: "Independent engineer review completed",
+    checked: true,
+    automatic: false,
+  },
+  { section: "EN 1992-1-1", label: "National Annex confirmed", checked: false, automatic: false },
+];
+
+const EC2_INPUT: PunchingShearInputEC2 = {
+  VEd: 500e3,
+  MEdx: 12e6,
+  MEdy: 30e6,
+  column: { c1: 400, c2: 400 },
+  d: 200,
+  slabThickness: 250,
+  fck: 30,
+  rhoLx: 0.01,
+  rhoLy: 0.01,
+  openings: [{ type: "circle", centerX: -700, centerY: 150, diameter: 150 }],
+  columnLocation: "interior",
+  punchingReinforcement: "none",
+};
+
+async function roundTripEC2(input: PunchingShearInputEC2) {
+  const r = calculatePunchingShearEC2(input);
+  if (!r.ok) throw new Error(r.reason);
+  const result: PunchingShearResultEC2 = r;
+  const bytes = await exportPunchingWorkbookEC2({
+    project: PROJECT,
+    input,
+    result,
+    review: null,
+    checklist: CHECKLIST,
+    exportedAt: new Date("2026-10-01T00:00:00Z"),
+  });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(bytes.buffer as ArrayBuffer);
+  return { wb, r };
+}
+
+describe("formatted Excel export — EN 1992-1-1", () => {
+  it.each([
+    ["biaxial (6.43) with an opening", EC2_INPUT],
+    ["one axis, no opening", { ...EC2_INPUT, MEdx: 0, openings: [] }],
+    ["concentric", { ...EC2_INPUT, MEdx: 0, MEdy: 0, openings: [] }],
+    ["k uncapped (d = 300)", { ...EC2_INPUT, d: 300, slabThickness: 350, openings: [] }],
+  ])("sheets and every formula reproduce the engine: %s", async (_name, input) => {
+    const { wb, r } = await roundTripEC2(input as PunchingShearInputEC2);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(Object.values(SHEET_NAMES_EC2));
+    const evaluate = evaluator(wb);
+    let formulas = 0;
+    for (const ws of wb.worksheets) {
+      ws.eachRow((row) =>
+        row.eachCell((cell) => {
+          const v = cell.value as ExcelJS.CellValue;
+          if (v === null || typeof v !== "object" || !("formula" in v)) return;
+          formulas += 1;
+          const computed = evaluate(v.formula, ws.name);
+          const cached = (v as ExcelJS.CellFormulaValue).result;
+          if (cached === undefined) expect(computed as number).toBeCloseTo(0, 9);
+          else if (typeof cached === "number") expect(computed as number).toBeCloseTo(cached, 6);
+          else expect(computed).toEqual(cached);
+        }),
+      );
+    }
+    expect(formulas).toBeGreaterThan(25);
+    let dcrSeen = false;
+    wb.getWorksheet(SHEET_NAMES_EC2.resistance)!.eachRow((row) => {
+      if (row.getCell(2).value === "DCR") {
+        dcrSeen = true;
+        expect(row.getCell(4).value).toBeCloseTo(r.dcr, 12);
+      }
+    });
+    expect(dcrSeen).toBe(true);
+  });
+
+  it("marks the module Experimental and records the checklist and engine version", async () => {
+    const { wb, r } = await roundTripEC2(EC2_INPUT);
+    const text: string[] = [];
+    for (const ws of wb.worksheets)
+      ws.eachRow((row) => row.eachCell((c) => text.push(String(c.value))));
+    expect(text.some((t) => /EXPERIMENTAL/i.test(t))).toBe(true);
+    expect(text).toContain(r.meta.engineVersion);
+    expect(text).toContain("Independent engineer review completed");
+    expect(text.some((t) => /1\/2 confirmations/i.test(t))).toBe(true);
+    expect(text).toContain("✔ confirmed");
+    expect(text).toContain("☐ open");
+  });
+});
+
+describe("compliance checklist in the ACI workbook", () => {
+  it("is written to the Audit sheet", async () => {
+    const input = REFERENCE_CASE;
+    const r = result(input);
+    const bytes = await exportPunchingWorkbook({
+      project: PROJECT,
+      input,
+      result: r,
+      review: null,
+      checklist: CHECKLIST,
+      exportedAt: new Date("2026-10-01T00:00:00Z"),
+    });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(bytes.buffer as ArrayBuffer);
+    const text: string[] = [];
+    wb.getWorksheet(SHEET_NAMES.audit)!.eachRow((row) =>
+      row.eachCell((c) => text.push(String(c.value))),
+    );
+    expect(text).toContain("National Annex confirmed");
+    expect(text.some((t) => /confirmations/i.test(t))).toBe(true);
   });
 });
