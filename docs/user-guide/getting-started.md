@@ -55,3 +55,7 @@ else console.log(outcome.reason, outcome.action);
 - **Engineer review:** enter reviewer, _Mark as reviewed_. Any later input change marks the review _outdated_.
 - **State** is kept in browser local storage; _Reset example_ restores the reference case.
 - **Export JSON** saves input, full result and review for audit. _Print / PDF_ uses the browser print dialog.
+- **Export Excel** downloads a formatted workbook: _Summary_ (DCR, status, key results, messages, review),
+  _Inputs_, _Geometry_, _Punching calculation_ (demand + full trace), _Capacity_ (Table 22.6.5.2) and _Audit_
+  (engine version, code references, warnings, input snapshot). Yellow cells are live formulas; _Engine value_
+  and _Δ_ columns let a checker confirm Excel and the engine agree. Disabled while the calculation is unavailable.
