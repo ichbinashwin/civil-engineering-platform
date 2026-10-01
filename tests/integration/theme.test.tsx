@@ -15,17 +15,40 @@ describe("themes and color mode", () => {
     expect([...select.options].map((o) => o.text)).toEqual(THEME_IDS.map((id) => THEMES[id].name));
   });
 
-  it("applies theme palette as CSS variables and persists the choice", () => {
+  it("first visit: Blueprint theme in Dark mode with the doodle wallpaper on", () => {
     render(<ThemedWorkspace />);
-    fireEvent.change(screen.getByLabelText("Theme"), { target: { value: "blueprint" } });
-    fireEvent.click(screen.getByRole("button", { name: /Dark/ }));
     const root = document.documentElement;
     expect(root.dataset.theme).toBe("blueprint");
     expect(root.dataset.mode).toBe("dark");
-    expect(root.style.getPropertyValue(cssVarName("canvas"))).toBe(THEMES.blueprint.dark.canvas);
-    expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY)!)).toEqual({
-      themeId: "blueprint",
-      mode: "dark",
+    expect((screen.getByLabelText("Theme") as HTMLSelectElement).value).toBe("blueprint");
+    expect(screen.getByRole("button", { name: /Dark/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(root.style.getPropertyValue("--wallpaper")).toContain("data:image/svg+xml");
+  });
+
+  it("wallpaper toggle removes and restores the pattern, and is remembered", () => {
+    render(<ThemedWorkspace />);
+    const button = screen.getByRole("button", { name: /Wallpaper/ });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(button);
+    expect(document.documentElement.style.getPropertyValue("--wallpaper")).toBe("none");
+    expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY)!).wallpaper).toBe(false);
+    fireEvent.click(button);
+    expect(document.documentElement.style.getPropertyValue("--wallpaper")).toContain(
+      "data:image/svg+xml",
+    );
+  });
+
+  it("applies theme palette as CSS variables and persists the choice", () => {
+    render(<ThemedWorkspace />);
+    fireEvent.change(screen.getByLabelText("Theme"), { target: { value: "concrete" } });
+    fireEvent.click(screen.getByRole("button", { name: /Light/ }));
+    const root = document.documentElement;
+    expect(root.dataset.theme).toBe("concrete");
+    expect(root.dataset.mode).toBe("light");
+    expect(root.style.getPropertyValue(cssVarName("canvas"))).toBe(THEMES.concrete.light.canvas);
+    expect(JSON.parse(window.localStorage.getItem(THEME_STORAGE_KEY)!)).toMatchObject({
+      themeId: "concrete",
+      mode: "light",
     });
   });
 

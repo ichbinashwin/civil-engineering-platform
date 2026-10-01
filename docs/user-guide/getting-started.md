@@ -75,3 +75,8 @@ else console.log(outcome.reason, outcome.action);
   panels widen. Click an icon to open the panel as a flyout —
   inputs stay editable and results stay live — then _Restore_ returns it to the dashboard, or press Esc /
   click outside to close. _Restore sidebar panels_ returns everything. Layout is remembered in the browser.
+- **Defaults and wallpaper:** a first visit opens in the _Blueprint_ theme in _Dark_ mode (an existing browser keeps
+  its saved choice). The page background is a chat-style doodle wallpaper of civil and structural engineering line
+  icons (I-beam, truss, bridge, crane, hard hat, rebar section, rulers …) and greyed emojis (👷 🏗️ 🧱 📐 🌉 …),
+  recoloured per theme and mode. The header _Wallpaper_ button turns it off and on; printing never includes it.
+  Generator: `apps/web/lib/wallpaper.ts`.

@@ -21,6 +21,7 @@ import {
   paletteToCss,
   resolveAutoMode,
 } from "@/lib/theme";
+import { wallpaperCssUrl } from "@/lib/wallpaper";
 import type { ColorMode, Palette, ResolvedMode, ThemeId } from "@/lib/theme";
 
 interface ThemeContextValue {
@@ -30,6 +31,9 @@ interface ThemeContextValue {
   palette: Palette;
   setThemeId: (id: ThemeId) => void;
   setMode: (mode: ColorMode) => void;
+  /** Civil / structural engineering doodle wallpaper behind the dashboard. */
+  wallpaper: boolean;
+  setWallpaper: (on: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -64,18 +68,33 @@ function subscribeClock(callback: () => void) {
   };
 }
 
-function loadPreference(): { themeId: ThemeId; mode: ColorMode } {
+interface Preference {
+  themeId: ThemeId;
+  mode: ColorMode;
+  wallpaper: boolean;
+}
+
+function loadPreference(): Preference {
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as { themeId?: unknown; mode?: unknown }) : {};
+    const parsed = raw
+      ? (JSON.parse(raw) as { themeId?: unknown; mode?: unknown; wallpaper?: unknown })
+      : {};
     return {
       themeId: isThemeId(parsed.themeId) ? parsed.themeId : DEFAULT_THEME,
       mode: isColorMode(parsed.mode) ? parsed.mode : DEFAULT_MODE,
+      wallpaper: typeof parsed.wallpaper === "boolean" ? parsed.wallpaper : true,
     };
   } catch {
-    return { themeId: DEFAULT_THEME, mode: DEFAULT_MODE };
+    return { themeId: DEFAULT_THEME, mode: DEFAULT_MODE, wallpaper: true };
   }
 }
+
+/** Doodle strength per mode: subtle like a chat wallpaper, never competing with the content. */
+const WALLPAPER_OPACITY = {
+  light: { line: 0.3, emoji: 0.2 },
+  dark: { line: 0.25, emoji: 0.17 },
+} as const;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [pref, setPref] = useState(loadPreference);
@@ -95,7 +114,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.dataset.mode = resolvedMode;
     root.style.colorScheme = resolvedMode;
     root.style.backgroundColor = palette.bg;
-  }, [palette, pref.themeId, resolvedMode]);
+    root.style.setProperty(
+      "--wallpaper",
+      pref.wallpaper
+        ? wallpaperCssUrl({
+            color: palette.muted,
+            lineOpacity: WALLPAPER_OPACITY[resolvedMode].line,
+            emojiOpacity: WALLPAPER_OPACITY[resolvedMode].emoji,
+          })
+        : "none",
+    );
+  }, [palette, pref.themeId, pref.wallpaper, resolvedMode]);
 
   useEffect(() => {
     try {
@@ -107,10 +136,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setThemeId = useCallback((themeId: ThemeId) => setPref((p) => ({ ...p, themeId })), []);
   const setMode = useCallback((mode: ColorMode) => setPref((p) => ({ ...p, mode })), []);
+  const setWallpaper = useCallback(
+    (wallpaper: boolean) => setPref((p) => ({ ...p, wallpaper })),
+    [],
+  );
 
   const value = useMemo(
-    () => ({ themeId: pref.themeId, mode: pref.mode, resolvedMode, palette, setThemeId, setMode }),
-    [pref, resolvedMode, palette, setThemeId, setMode],
+    () => ({
+      themeId: pref.themeId,
+      mode: pref.mode,
+      resolvedMode,
+      palette,
+      setThemeId,
+      setMode,
+      wallpaper: pref.wallpaper,
+      setWallpaper,
+    }),
+    [pref, resolvedMode, palette, setThemeId, setMode, setWallpaper],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -126,5 +168,7 @@ export function useTheme(): ThemeContextValue {
     palette: THEMES[DEFAULT_THEME].light,
     setThemeId: () => undefined,
     setMode: () => undefined,
+    wallpaper: false,
+    setWallpaper: () => undefined,
   };
 }

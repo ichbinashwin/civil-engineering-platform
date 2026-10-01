@@ -350,8 +350,8 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
-export const DEFAULT_THEME: ThemeId = "structural";
-export const DEFAULT_MODE: ColorMode = "auto";
+export const DEFAULT_THEME: ThemeId = "blueprint";
+export const DEFAULT_MODE: ColorMode = "dark";
 export const THEME_STORAGE_KEY = "civil-platform:theme:v1";
 
 /** camelCase palette key → CSS custom property name (accentSoft → --accent-soft). */

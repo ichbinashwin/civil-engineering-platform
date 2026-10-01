@@ -13,7 +13,7 @@ const MODES: { mode: ColorMode; label: string; icon: string }[] = [
 
 /** Header controls: engineering theme dropdown and Light / Dark / Auto mode toggle. */
 export function ThemeControls() {
-  const { themeId, mode, resolvedMode, setThemeId, setMode } = useTheme();
+  const { themeId, mode, resolvedMode, setThemeId, setMode, wallpaper, setWallpaper } = useTheme();
   const selectId = useId();
   return (
     <div className="theme-controls">
@@ -50,6 +50,15 @@ export function ThemeControls() {
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        className="btn wallpaper-btn"
+        aria-pressed={wallpaper}
+        title="Civil & structural engineering doodle wallpaper"
+        onClick={() => setWallpaper(!wallpaper)}
+      >
+        <span aria-hidden="true">🏗️</span> Wallpaper
+      </button>
     </div>
   );
 }

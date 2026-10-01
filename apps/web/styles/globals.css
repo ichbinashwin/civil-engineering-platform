@@ -62,7 +62,11 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  /* Doodle wallpaper tile, generated per theme/mode by ThemeProvider (lib/wallpaper.ts). */
+  background-image: var(--wallpaper, none);
+  background-size: 520px 520px;
+  background-attachment: fixed;
   color: var(--ink);
   font:
     14px/1.45 Inter,
@@ -218,6 +222,11 @@ body {
 .mode-toggle button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-ink);
+}
+.wallpaper-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent2);
+  color: var(--accent-text);
 }
 .topbar-right {
   display: flex;
@@ -951,6 +960,9 @@ details.trace summary {
 }
 
 @media print {
+  body {
+    background-image: none !important;
+  }
   .app-header .actions,
   .viz-toolbar,
   .no-print {
