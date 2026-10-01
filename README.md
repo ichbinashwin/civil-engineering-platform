@@ -86,6 +86,10 @@ Every result exposes each step's formula, substituted values, result, unit and A
 
 ## Calculation verification
 
+[docs/verification/formula-audit.md](docs/verification/formula-audit.md) audits every formula. The engine reproduces
+the independent CSI hand calculation _ACI 318-14 RC-PN-001_ exactly (bo, γv, IXX, IYY, vu = 0.1930 ksi,
+φvc = 0.158 ksi, ratio 1.22) and passes brute-force numerical cross-checks of the opening geometry.
+
 [docs/verification/punching-reference-case.md](docs/verification/punching-reference-case.md) compares the engine
 with the supplied reference calculation. Key finding: the reference omits the ACI 318-19 size-effect factor λs;
 the engine applies λs by default (DCR 0.895) and reproduces the reference (DCR 0.785) only with

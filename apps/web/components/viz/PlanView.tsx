@@ -685,6 +685,8 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               <dd>{formatNumber(result.geometry.Jx, 0)} in⁴</dd>
               <dt>Jy</dt>
               <dd>{formatNumber(result.geometry.Jy, 0)} in⁴</dd>
+              <dt>Jxy</dt>
+              <dd>{formatNumber(result.geometry.Jxy, 1)} in⁴</dd>
             </dl>
             <button
               type="button"

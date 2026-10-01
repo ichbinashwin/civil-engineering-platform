@@ -38,12 +38,18 @@ Jx = d·Ix + Σ L·d³/12 · uy²               Jy = d·Iy + Σ L·d³/12 · ux�
 ```
 
 For a complete rectangle this reproduces the ACI 318-19 R8.4.4.2.3 interior-column expression
-Jc = d b1³/6 + b1 d³/6 + d b2 b1²/2 exactly (unit-tested).
+Jc = d b1³/6 + b1 d³/6 + d b2 b1²/2 exactly (unit-tested), and CSI RC-PN-001 IXX/IYY exactly.
+
+```text
+Ixy = Σ L/6 (2 xa·ya + xa·yb + xb·ya + 2 xb·yb)      Jxy = d·Ixy   (0 for a symmetric section)
+```
+
+Verification: [docs/verification/formula-audit.md](../verification/formula-audit.md).
 
 ## Software-level choices (not code provisions) — review required
 
-1. **Sign envelope**: moment-induced stresses use absolute values at every critical point (conservative; sign
-   convention of input moments not required).
+1. **Moment signs**: default envelope takes each moment term with its worst sign (|term x| + |term y|, conservative).
+   Option `momentSignConvention: "signed"` uses the entered signs (positive Mux raises stress on +y, Muy on +x).
 2. **Centroid shift moment**: Vu·e from the effective-section centroid offset is _not_ added; its magnitude is
    reported as INFO (cf. ACI 421.1R).
 3. **Openings beyond 4h**: reduction is applied conservatively (column-strip location is unknown); INFO raised.

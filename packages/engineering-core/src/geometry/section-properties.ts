@@ -10,6 +10,11 @@ import type { Segment } from "./rectangular-perimeter";
  * to an arbitrary set of segments:
  *   Jx = d * Ix + sum(L d^3 / 12 * uy^2),  Jy = d * Iy + sum(L d^3 / 12 * ux^2)
  * where (ux, uy) is the segment unit direction. For a full rectangle this reproduces Jc exactly.
+ *
+ * Ixy, Jxy: product of inertia, Ixy = sum(L/6 (2 xa ya + xa yb + xb ya + 2 xb yb)), Jxy = d * Ixy.
+ * Non-zero when openings make the section asymmetric; it couples Mux and Muy in the general
+ * biaxial stress formula (CSI SAFE/ETABS punching formulation; ACI 421.1R). The torsional d^3
+ * cross term is zero because every critical-section segment is parallel to X or Y.
  */
 export interface CriticalSectionProperties {
   perimeter: number;
@@ -19,9 +24,15 @@ export interface CriticalSectionProperties {
   Iy: number;
   Jx: number;
   Jy: number;
+  Ixy: number;
+  Jxy: number;
 }
 
 const TORSIONAL_TERM_DIVISOR = 12;
+
+function lineProductMoment(xa: number, ya: number, xb: number, yb: number, length: number): number {
+  return (length / 6) * (2 * xa * ya + xa * yb + xb * ya + 2 * xb * yb);
+}
 
 function lineSecondMoment(a: number, b: number, length: number): number {
   return (length / 3) * (a * a + a * b + b * b);
@@ -39,11 +50,19 @@ export function criticalSectionProperties(
 
   let Ix = 0;
   let Iy = 0;
+  let Ixy = 0;
   let torsionX = 0;
   let torsionY = 0;
   for (const s of segments) {
     Ix += lineSecondMoment(s.start.y - centroidY, s.end.y - centroidY, s.length);
     Iy += lineSecondMoment(s.start.x - centroidX, s.end.x - centroidX, s.length);
+    Ixy += lineProductMoment(
+      s.start.x - centroidX,
+      s.start.y - centroidY,
+      s.end.x - centroidX,
+      s.end.y - centroidY,
+      s.length,
+    );
     const ux = (s.end.x - s.start.x) / s.length;
     const uy = (s.end.y - s.start.y) / s.length;
     const torsion = (s.length * d ** 3) / TORSIONAL_TERM_DIVISOR;
@@ -59,5 +78,7 @@ export function criticalSectionProperties(
     Iy,
     Jx: d * Ix + torsionX,
     Jy: d * Iy + torsionY,
+    Ixy,
+    Jxy: d * Ixy,
   };
 }
