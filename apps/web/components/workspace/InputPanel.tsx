@@ -2,6 +2,7 @@ import { useId } from "react";
 import type { CalculationWarning } from "@civil/shared-types";
 import { createOpening } from "@/lib/form";
 import type { FormState, NumericField, OpeningForm } from "@/lib/form";
+import { Pane } from "../layout/Pane";
 import { NumberField } from "./NumberField";
 
 interface InputPanelProps {
@@ -61,11 +62,8 @@ export function InputPanel({
   );
 
   return (
-    <aside className="panel" aria-label="Design inputs">
-      <h2>
-        Design Inputs <span className="badge info">Editable</span>
-      </h2>
-      <div className="panel-body">
+    <Pane id="inputs" badge={<span className="badge info">Editable</span>}>
+      <div>
         <fieldset className="group">
           <legend className="group-title">Project</legend>
           <div className="row wide">
@@ -299,6 +297,6 @@ export function InputPanel({
           the calculation engine.
         </div>
       </div>
-    </aside>
+    </Pane>
   );
 }

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { PunchingShearOutcome } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
+import { Pane } from "../layout/Pane";
 
 /** Human-in-the-loop sign-off. A review is bound to the exact input snapshot it approved. */
 export interface ReviewRecord {
@@ -38,18 +39,19 @@ export function ReviewPanel({
   const canReview = outcome.ok && reviewer.trim().length > 0;
 
   return (
-    <section className="panel" aria-labelledby="review-h">
-      <h2 id="review-h">
-        Engineer review
-        {current ? (
+    <Pane
+      id="review"
+      badge={
+        current ? (
           <span className="badge pass">REVIEWED</span>
         ) : outdated ? (
           <span className="badge warn">REVIEW OUTDATED</span>
         ) : (
           <span className="badge info">DRAFT</span>
-        )}
-      </h2>
-      <div className="panel-body">
+        )
+      }
+    >
+      <div>
         <p className="small" role="status" style={{ marginTop: 0 }}>
           {current && review
             ? `Reviewed by ${review.reviewer} on ${new Date(review.reviewedAt).toLocaleString()} (DCR ${formatNumber(review.dcr, 3)}, ${review.status}, engine v${review.engineVersion}).`
@@ -108,6 +110,6 @@ export function ReviewPanel({
         </div>
         {!outcome.ok && <p className="small">A review requires a valid calculation.</p>}
       </div>
-    </section>
+    </Pane>
   );
 }

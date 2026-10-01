@@ -1,4 +1,5 @@
 import type { CalculationWarning } from "@civil/shared-types";
+import { Pane } from "../layout/Pane";
 
 const BADGE: Record<CalculationWarning["severity"], string> = {
   ERROR: "fail",
@@ -10,11 +11,8 @@ const ORDER: Record<CalculationWarning["severity"], number> = { ERROR: 0, WARNIN
 export function WarningsList({ warnings }: { warnings: CalculationWarning[] }) {
   const sorted = [...warnings].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
   return (
-    <section className="panel" aria-labelledby="warn-h">
-      <h2 id="warn-h">
-        Engineering messages <span className="badge info">{warnings.length}</span>
-      </h2>
-      <div className="panel-body">
+    <Pane id="messages" badge={<span className="badge info">{warnings.length}</span>}>
+      <div>
         {sorted.length === 0 ? (
           <p className="small" style={{ margin: 0 }}>
             No warnings.
@@ -33,6 +31,6 @@ export function WarningsList({ warnings }: { warnings: CalculationWarning[] }) {
           </ul>
         )}
       </div>
-    </section>
+    </Pane>
   );
 }

@@ -1,12 +1,12 @@
 import type { CalculationStep } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
+import { Pane } from "../layout/Pane";
 
 /** Expandable step-by-step trace: formula, substitution, result, unit, provision. */
 export function CalculationTrace({ steps }: { steps: CalculationStep[] }) {
   return (
-    <details className="trace section">
-      <summary>Calculation trace ({steps.length} steps)</summary>
-      <table style={{ marginTop: 10 }}>
+    <Pane id="trace" badge={<span className="badge info">{steps.length} steps</span>}>
+      <table>
         <caption className="sr-only">Calculation trace</caption>
         <thead>
           <tr>
@@ -35,6 +35,6 @@ export function CalculationTrace({ steps }: { steps: CalculationStep[] }) {
           ))}
         </tbody>
       </table>
-    </details>
+    </Pane>
   );
 }

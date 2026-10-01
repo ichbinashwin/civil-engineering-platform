@@ -1,5 +1,6 @@
 import type { PunchingShearOutcome } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
+import { Pane } from "../layout/Pane";
 
 export function KpiStrip({ outcome }: { outcome: PunchingShearOutcome }) {
   const r = outcome.ok ? outcome : null;
@@ -22,16 +23,18 @@ export function KpiStrip({ outcome }: { outcome: PunchingShearOutcome }) {
     { label: "DCR", value: r ? formatNumber(r.dcr, 3) : "—", unit: r ? r.status : "unavailable" },
   ];
   return (
-    <div className="kpis" role="group" aria-label="Key results">
-      {items.map((k) => (
-        <div className="kpi" key={k.label}>
-          <div className="label">{k.label}</div>
-          <div className="value" aria-live="polite">
-            {k.value}
+    <Pane id="kpis" flush>
+      <div className="kpis" role="group" aria-label="Key results">
+        {items.map((k) => (
+          <div className="kpi" key={k.label}>
+            <div className="label">{k.label}</div>
+            <div className="value" aria-live="polite">
+              {k.value}
+            </div>
+            <div className="unit">{k.unit}</div>
           </div>
-          <div className="unit">{k.unit}</div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </Pane>
   );
 }

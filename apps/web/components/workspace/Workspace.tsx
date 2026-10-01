@@ -4,6 +4,10 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { calculatePunchingShear } from "@civil/engineering-core";
 import { EXAMPLE_FORM, fieldMessages, toEngineInput } from "@/lib/form";
 import type { FormState } from "@/lib/form";
+import { DockRail } from "../layout/DockRail";
+import { LayoutBar } from "../layout/LayoutBar";
+import { Pane } from "../layout/Pane";
+import { PaneLayoutProvider, usePaneLayout } from "../layout/PaneLayout";
 import { ThemeControls } from "../theme/ThemeControls";
 import { VisualizationPanel } from "../viz/VisualizationPanel";
 import { CalculationTrace } from "./CalculationTrace";
@@ -48,11 +52,15 @@ function download(filename: string, content: BlobPart, type = "application/json"
  * Engineering workspace: every input is editable (human in the loop) and every output —
  * KPIs, tables, trace, plan, 3D, messages — recalculates live from the engine.
  */
-export function Workspace() {
+function WorkspaceInner() {
   const [initial] = useState(loadStored);
   const [form, setForm] = useState<FormState>(initial?.form ?? EXAMPLE_FORM);
   const [review, setReview] = useState<ReviewRecord | null>(initial?.review ?? null);
   const [selectedOpening, setSelectedOpening] = useState<string | null>(null);
+  const { isDocked, dockedIds } = usePaneLayout();
+  // A column whose panes are all docked disappears from the flow (display: contents); a peeked pane
+  // is position: fixed, so it still renders.
+  const colEmpty = (ids: Parameters<typeof isDocked>[0][]) => ids.every((id) => isDocked(id));
 
   const input = useMemo(() => toEngineInput(form), [form]);
   const inputSignature = useMemo(() => JSON.stringify(input), [input]);
@@ -178,17 +186,22 @@ export function Workspace() {
         </div>
       </header>
 
-      <main className="workspace">
+      <main className={`workspace${dockedIds.length > 0 ? " has-rail" : ""}`}>
+        <LayoutBar />
         <div className="grid">
-          <InputPanel
-            form={form}
-            onChange={setForm}
-            messages={messages}
-            selectedOpening={selectedOpening}
-            onSelectOpening={setSelectedOpening}
-          />
+          <div className={`col col-left${colEmpty(["inputs"]) ? " col-empty" : ""}`}>
+            <InputPanel
+              form={form}
+              onChange={setForm}
+              messages={messages}
+              selectedOpening={selectedOpening}
+              onSelectOpening={setSelectedOpening}
+            />
+          </div>
 
-          <section className="panel" aria-label="Calculation">
+          <div
+            className={`col col-center stack${colEmpty(["kpis", "viz", "tables", "trace"]) ? " col-empty" : ""}`}
+          >
             <KpiStrip outcome={outcome} />
             <VisualizationPanel
               input={vizInput}
@@ -202,19 +215,22 @@ export function Workspace() {
                 <CalculationTrace steps={outcome.steps} />
               </>
             ) : (
-              <div className="section">
-                <p className="small">Tables and trace appear when the inputs are valid.</p>
-              </div>
+              <section className="panel">
+                <div className="panel-body">
+                  <p className="small" style={{ margin: 0 }}>
+                    Tables and trace appear when the inputs are valid.
+                  </p>
+                </div>
+              </section>
             )}
-          </section>
+          </div>
 
-          <div className="stack right sticky-col">
-            <section className="panel" aria-labelledby="result-h">
-              <h2 id="result-h">Result</h2>
-              <div className="panel-body">
-                <ResultCard outcome={outcome} />
-              </div>
-            </section>
+          <div
+            className={`col col-right stack sticky-col${colEmpty(["result", "review", "messages", "refs"]) ? " col-empty" : ""}`}
+          >
+            <Pane id="result">
+              <ResultCard outcome={outcome} />
+            </Pane>
             <ReviewPanel
               outcome={outcome}
               inputSignature={inputSignature}
@@ -223,28 +239,25 @@ export function Workspace() {
               defaultReviewer={form.engineer}
             />
             <WarningsList warnings={outcome.warnings} />
-            <section className="panel" aria-labelledby="refs-h">
-              <h2 id="refs-h">Code references</h2>
-              <div className="panel-body">
-                {outcome.ok ? (
-                  <ul className="warnings">
-                    {outcome.codeReferences.map((r) => (
-                      <li key={r.section}>
-                        <span className="ref">§{r.section}</span>
-                        <span className="small">{r.description}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="small">Available when the calculation is valid.</p>
-                )}
-                {outcome.ok && (
-                  <p className="small" style={{ marginBottom: 0 }}>
-                    {outcome.meta.designCode} · engine v{outcome.meta.engineVersion}
-                  </p>
-                )}
-              </div>
-            </section>
+            <Pane id="refs">
+              {outcome.ok ? (
+                <ul className="warnings">
+                  {outcome.codeReferences.map((r) => (
+                    <li key={r.section}>
+                      <span className="ref">§{r.section}</span>
+                      <span className="small">{r.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="small">Available when the calculation is valid.</p>
+              )}
+              {outcome.ok && (
+                <p className="small" style={{ marginBottom: 0 }}>
+                  {outcome.meta.designCode} · engine v{outcome.meta.engineVersion}
+                </p>
+              )}
+            </Pane>
             <div className="note">
               <b>Engineering control:</b> This is a calculation aid, not a substitute for
               project-specific engineering review. Confirm code applicability, units, slab
@@ -254,11 +267,20 @@ export function Workspace() {
           </div>
         </div>
       </main>
+      <DockRail />
       <div className="footer">
         ACI 318-19 provisions applied: §8.4.2.2, §8.4.4.2, §21.2.1, §22.5.5.1.3, §22.6, §22.6.3.1,
         §22.6.4, §22.6.4.1, §22.6.4.3 and Table 22.6.5.2. Verify the governing provisions for the
         project.
       </div>
     </>
+  );
+}
+
+export function Workspace() {
+  return (
+    <PaneLayoutProvider>
+      <WorkspaceInner />
+    </PaneLayoutProvider>
   );
 }

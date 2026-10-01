@@ -63,3 +63,10 @@ else console.log(outcome.reason, outcome.action);
   _Concrete & Rebar_ (warm greys, rebar-orange accents). **Light / Dark / Auto** toggle next to it; _Auto_
   follows the operating-system setting. Both choices are remembered in the browser. Colors live in
   `apps/web/lib/theme.ts` (single source for CSS, plan view and 3D). PASS/FAIL is always shown as text.
+- **Collapsible panels:** every container (Design Inputs, Key results, Visualization, Calculation tables,
+  Calculation trace, Result, Engineer review, Engineering messages, Code references) has a chevron to collapse
+  it in place (header stays). The trace starts collapsed. _Expand all / Collapse all_ are above the grid.
+- **Sidebar dock:** the button at the right of each header moves a panel into the icon rail on the right edge
+  (only its icon stays visible, and the remaining panels widen). Click an icon to open the panel as a flyout —
+  inputs stay editable and results stay live — then _Restore_ returns it to the dashboard, or press Esc /
+  click outside to close. _Restore sidebar panels_ returns everything. Layout is remembered in the browser.

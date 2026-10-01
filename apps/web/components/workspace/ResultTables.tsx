@@ -1,5 +1,6 @@
 import type { PunchingShearResult } from "@civil/shared-types";
 import { formatNumber } from "@/lib/format";
+import { Pane } from "../layout/Pane";
 
 type Row = [label: string, value: string, unit: string, ref?: string, governing?: boolean];
 
@@ -94,15 +95,17 @@ export function ResultTables({ result }: { result: PunchingShearResult }) {
     ["φvc", formatNumber(c.designStrength, 1), "psi", "§22.6", true],
   ];
   return (
-    <>
-      <section className="section" aria-labelledby="geo-h">
+    <Pane
+      id="tables"
+      badge={<span className="badge info">{g.openingReductions.length} opening(s) assessed</span>}
+    >
+      <section aria-labelledby="geo-h" style={{ marginBottom: 18 }}>
         <h3 id="geo-h" className="section-title">
           Critical Section Geometry
-          <span className="badge info">{g.openingReductions.length} opening(s) assessed</span>
         </h3>
         <Table caption="Critical section geometry" rows={geometryRows} />
       </section>
-      <div className="tables section" style={{ padding: "15px 17px" }}>
+      <div className="tables">
         <section aria-labelledby="dem-h">
           <h3 id="dem-h" className="section-title">
             Punching Shear Demand
@@ -116,6 +119,6 @@ export function ResultTables({ result }: { result: PunchingShearResult }) {
           <Table caption="Concrete shear strength" rows={capacityRows} />
         </section>
       </div>
-    </>
+    </Pane>
   );
 }

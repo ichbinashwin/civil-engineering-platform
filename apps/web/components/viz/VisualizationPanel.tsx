@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import type { PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
+import { Pane } from "../layout/Pane";
 import { PlanView } from "./PlanView";
 
 const View3D = dynamic(() => import("./View3D").then((m) => m.View3D), {
@@ -22,11 +23,9 @@ interface VisualizationPanelProps {
 export function VisualizationPanel(props: VisualizationPanelProps) {
   const [tab, setTab] = useState<Tab>("plan");
   return (
-    <section className="section" aria-labelledby="viz-h">
-      <div className="section-title">
-        <h3 id="viz-h" style={{ margin: 0, fontSize: 14 }}>
-          Engineering Visualization
-        </h3>
+    <Pane
+      id="viz"
+      badge={
         <div className="tabs" role="tablist" aria-label="View">
           <button
             type="button"
@@ -45,7 +44,8 @@ export function VisualizationPanel(props: VisualizationPanelProps) {
             3D
           </button>
         </div>
-      </div>
+      }
+    >
       <div role="tabpanel">
         {tab === "plan" ? (
           <PlanView {...props} />
@@ -57,6 +57,6 @@ export function VisualizationPanel(props: VisualizationPanelProps) {
           />
         )}
       </div>
-    </section>
+    </Pane>
   );
 }
