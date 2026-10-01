@@ -17,7 +17,9 @@ import {
   THEME_STORAGE_KEY,
   isColorMode,
   isThemeId,
+  nextAutoSwitch,
   paletteToCss,
+  resolveAutoMode,
 } from "@/lib/theme";
 import type { ColorMode, Palette, ResolvedMode, ThemeId } from "@/lib/theme";
 
@@ -32,16 +34,34 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const DARK_QUERY = "(prefers-color-scheme: dark)";
+/** Longest setTimeout delay browsers accept. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+/** Small margin so the clock has certainly passed the boundary when the timer fires. */
+const SWITCH_MARGIN_MS = 500;
 
-function subscribeSystem(callback: () => void) {
-  const mq = window.matchMedia?.(DARK_QUERY);
-  mq?.addEventListener("change", callback);
-  return () => mq?.removeEventListener("change", callback);
-}
-
-function systemPrefersDark(): boolean {
-  return window.matchMedia?.(DARK_QUERY).matches ?? false;
+/**
+ * Clock subscription for Auto mode: notifies at every local 07:00 / 19:00 boundary, and on tab focus
+ * or visibility change (covers laptop sleep, clock/timezone changes while the tab was in background).
+ */
+function subscribeClock(callback: () => void) {
+  let timer: number | undefined;
+  const arm = () => {
+    window.clearTimeout(timer);
+    const wait = nextAutoSwitch(new Date()).getTime() - Date.now() + SWITCH_MARGIN_MS;
+    timer = window.setTimeout(wake, Math.min(Math.max(wait, SWITCH_MARGIN_MS), MAX_TIMEOUT_MS));
+  };
+  const wake = () => {
+    callback();
+    arm();
+  };
+  arm();
+  document.addEventListener("visibilitychange", wake);
+  window.addEventListener("focus", wake);
+  return () => {
+    window.clearTimeout(timer);
+    document.removeEventListener("visibilitychange", wake);
+    window.removeEventListener("focus", wake);
+  };
 }
 
 function loadPreference(): { themeId: ThemeId; mode: ColorMode } {
@@ -59,9 +79,12 @@ function loadPreference(): { themeId: ThemeId; mode: ColorMode } {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [pref, setPref] = useState(loadPreference);
-  const systemDark = useSyncExternalStore(subscribeSystem, systemPrefersDark, () => false);
-  const resolvedMode: ResolvedMode =
-    pref.mode === "auto" ? (systemDark ? "dark" : "light") : pref.mode;
+  const timeMode = useSyncExternalStore(
+    subscribeClock,
+    () => resolveAutoMode(new Date()),
+    () => "light" as const,
+  );
+  const resolvedMode: ResolvedMode = pref.mode === "auto" ? timeMode : pref.mode;
   const palette = THEMES[pref.themeId][resolvedMode];
 
   useEffect(() => {

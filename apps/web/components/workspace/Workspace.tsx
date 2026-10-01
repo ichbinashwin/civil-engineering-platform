@@ -57,7 +57,7 @@ function WorkspaceInner() {
   const [form, setForm] = useState<FormState>(initial?.form ?? EXAMPLE_FORM);
   const [review, setReview] = useState<ReviewRecord | null>(initial?.review ?? null);
   const [selectedOpening, setSelectedOpening] = useState<string | null>(null);
-  const { isDocked, dockedIds } = usePaneLayout();
+  const { isDocked, dockedOn } = usePaneLayout();
   // A column whose panes are all docked disappears from the flow (display: contents); a peeked pane
   // is position: fixed, so it still renders.
   const colEmpty = (ids: Parameters<typeof isDocked>[0][]) => ids.every((id) => isDocked(id));
@@ -186,7 +186,9 @@ function WorkspaceInner() {
         </div>
       </header>
 
-      <main className={`workspace${dockedIds.length > 0 ? " has-rail" : ""}`}>
+      <main
+        className={`workspace${dockedOn("left").length > 0 ? " has-rail-left" : ""}${dockedOn("right").length > 0 ? " has-rail-right" : ""}`}
+      >
         <LayoutBar />
         <div className="grid">
           <div className={`col col-left${colEmpty(["inputs"]) ? " col-empty" : ""}`}>
@@ -267,7 +269,8 @@ function WorkspaceInner() {
           </div>
         </div>
       </main>
-      <DockRail />
+      <DockRail side="left" />
+      <DockRail side="right" />
       <div className="footer">
         ACI 318-19 provisions applied: §8.4.2.2, §8.4.4.2, §21.2.1, §22.5.5.1.3, §22.6, §22.6.3.1,
         §22.6.4, §22.6.4.1, §22.6.4.3 and Table 22.6.5.2. Verify the governing provisions for the

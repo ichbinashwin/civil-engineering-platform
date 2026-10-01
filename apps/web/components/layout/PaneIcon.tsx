@@ -1,7 +1,7 @@
 import type { PaneIconName } from "@/lib/panes";
 
 const PATHS: Record<
-  PaneIconName | "chevron" | "dock" | "restore" | "close" | "expand",
+  PaneIconName | "chevron" | "dock" | "restore" | "dockLeft" | "restoreLeft" | "close" | "expand",
   React.ReactNode
 > = {
   sliders: (
@@ -68,6 +68,18 @@ const PATHS: Record<
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M15 4v16M11 9l-3 3 3 3" />
+    </>
+  ),
+  dockLeft: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16M16 9l-3 3 3 3" />
+    </>
+  ),
+  restoreLeft: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16M13 9l3 3-3 3" />
     </>
   ),
   close: <path d="M6 6l12 12M18 6L6 18" />,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { THEMES, THEME_IDS } from "@/lib/theme";
+import { AUTO_SCHEDULE_LABEL, THEMES, THEME_IDS, detectTimeZone } from "@/lib/theme";
 import type { ColorMode, ThemeId } from "@/lib/theme";
 import { useTheme } from "./ThemeProvider";
 
@@ -40,7 +40,9 @@ export function ThemeControls() {
             type="button"
             aria-pressed={mode === m.mode}
             title={
-              m.mode === "auto" ? `Auto — follows system (now ${resolvedMode})` : `${m.label} mode`
+              m.mode === "auto"
+                ? `Auto — by time of day in ${detectTimeZone()}: ${AUTO_SCHEDULE_LABEL} (now ${resolvedMode})`
+                : `${m.label} mode`
             }
             onClick={() => setMode(m.mode)}
           >

@@ -2,31 +2,36 @@
 
 import { useEffect } from "react";
 import { PANES } from "@/lib/panes";
+import type { DockSide } from "@/lib/panes";
 import { Icon } from "./PaneIcon";
 import { usePaneLayout } from "./PaneLayout";
 
 /**
- * Right-edge sidebar listing docked panes as icons. Click an icon to peek the pane as a flyout;
- * Esc or a click outside closes it. Hidden while nothing is docked.
+ * Edge sidebar listing docked panes of one side as icons. Click an icon to peek the pane as a flyout;
+ * Esc or a click outside closes it. Hidden while nothing is docked on this side.
  */
-export function DockRail() {
-  const { dockedIds, peek, setPeek, restoreAll } = usePaneLayout();
+export function DockRail({ side }: { side: DockSide }) {
+  const { dockedOn, peek, setPeek, restoreSide } = usePaneLayout();
+  const ids = dockedOn(side);
+  const peekingHere = peek !== null && PANES[peek].side === side && ids.includes(peek);
 
   useEffect(() => {
-    if (!peek) return;
+    if (!peekingHere) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setPeek(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [peek, setPeek]);
+  }, [peekingHere, setPeek]);
 
-  if (dockedIds.length === 0) return null;
+  if (ids.length === 0) return null;
   return (
     <>
-      {peek && <div className="dock-backdrop" onClick={() => setPeek(null)} aria-hidden="true" />}
-      <nav className="dock-rail no-print" aria-label="Docked panels">
-        {dockedIds.map((id) => {
+      {peekingHere && (
+        <div className="dock-backdrop" onClick={() => setPeek(null)} aria-hidden="true" />
+      )}
+      <nav className={`dock-rail ${side} no-print`} aria-label={`Docked panels, ${side} sidebar`}>
+        {ids.map((id) => {
           const open = peek === id;
           return (
             <button
@@ -35,7 +40,7 @@ export function DockRail() {
               className="dock-btn"
               aria-pressed={open}
               title={PANES[id].title}
-              aria-label={`${PANES[id].title} (in sidebar) — ${open ? "close" : "open"}`}
+              aria-label={`${PANES[id].title} (in ${side} sidebar) — ${open ? "close" : "open"}`}
               onClick={() => setPeek(open ? null : id)}
             >
               <Icon name={PANES[id].icon} size={20} />
@@ -46,9 +51,9 @@ export function DockRail() {
         <button
           type="button"
           className="dock-btn"
-          title="Restore all panels to the dashboard"
-          aria-label="Restore all panels to the dashboard"
-          onClick={restoreAll}
+          title={`Restore all ${side} sidebar panels to the dashboard`}
+          aria-label={`Restore all ${side} sidebar panels to the dashboard`}
+          onClick={() => restoreSide(side)}
         >
           <Icon name="expand" size={18} />
         </button>

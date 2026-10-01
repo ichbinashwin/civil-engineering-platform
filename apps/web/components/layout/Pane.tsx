@@ -32,10 +32,11 @@ export function Pane({ id, badge, flush = false, children }: PaneProps) {
 
   return (
     <section
-      className={`panel pane${docked ? " docked" : ""}${peeking ? " peek" : ""}`}
+      className={`panel pane${docked ? " docked" : ""}${peeking ? ` peek side-${def.side}` : ""}`}
       aria-labelledby={headId}
       data-pane={id}
       style={peeking ? { width: `min(${def.flyoutWidth}px, calc(100vw - 84px))` } : undefined}
+      data-side={def.side}
     >
       <header className="pane-head">
         <h2 id={headId} className="pane-title">
@@ -72,7 +73,7 @@ export function Pane({ id, badge, flush = false, children }: PaneProps) {
                 aria-label={`Restore ${def.title} to the dashboard`}
                 onClick={() => restore(id)}
               >
-                <Icon name="restore" size={16} />
+                <Icon name={def.side === "left" ? "restoreLeft" : "restore"} size={16} />
               </button>
               <button
                 type="button"
@@ -88,11 +89,11 @@ export function Pane({ id, badge, flush = false, children }: PaneProps) {
             <button
               type="button"
               className="icon-btn"
-              title={`Move ${def.title} to the sidebar`}
-              aria-label={`Move ${def.title} to the sidebar`}
+              title={`Move ${def.title} to the ${def.side} sidebar`}
+              aria-label={`Move ${def.title} to the ${def.side} sidebar`}
               onClick={() => dock(id)}
             >
-              <Icon name="dock" size={16} />
+              <Icon name={def.side === "left" ? "dockLeft" : "dock"} size={16} />
             </button>
           )}
         </span>

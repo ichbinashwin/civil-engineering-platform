@@ -61,12 +61,17 @@ else console.log(outcome.reason, outcome.action);
   and _Δ_ columns let a checker confirm Excel and the engine agree. Disabled while the calculation is unavailable.
 - **Theme** (header dropdown): _Structural Blue_ (default), _Blueprint_ (drafting-blueprint drawing canvas),
   _Concrete & Rebar_ (warm greys, rebar-orange accents). **Light / Dark / Auto** toggle next to it; _Auto_
-  follows the operating-system setting. Both choices are remembered in the browser. Colors live in
+  follows the **time of day in your browser's detected timezone** (light 07:00–19:00, dark 19:00–07:00; hours are
+  `AUTO_LIGHT_FROM_HOUR` / `AUTO_DARK_FROM_HOUR` in `apps/web/lib/theme.ts`). It switches at those times without a
+  reload and re-checks after sleep or a timezone change; hover _Auto_ to see the timezone and current mode.
+  Both choices are remembered in the browser. Colors live in
   `apps/web/lib/theme.ts` (single source for CSS, plan view and 3D). PASS/FAIL is always shown as text.
 - **Collapsible panels:** every container (Design Inputs, Key results, Visualization, Calculation tables,
   Calculation trace, Result, Engineer review, Engineering messages, Code references) has a chevron to collapse
   it in place (header stays). The trace starts collapsed. _Expand all / Collapse all_ are above the grid.
-- **Sidebar dock:** the button at the right of each header moves a panel into the icon rail on the right edge
-  (only its icon stays visible, and the remaining panels widen). Click an icon to open the panel as a flyout —
+- **Sidebar dock:** the button at the right of each header moves a panel into the icon rail on its own side:
+  left-column panels (Design Inputs) dock to the **left** rail, right-column panels (Result, Review, Messages,
+  References) and the wide centre panels dock to the **right** rail. Only its icon stays visible and the remaining
+  panels widen. Click an icon to open the panel as a flyout —
   inputs stay editable and results stay live — then _Restore_ returns it to the dashboard, or press Esc /
   click outside to close. _Restore sidebar panels_ returns everything. Layout is remembered in the browser.

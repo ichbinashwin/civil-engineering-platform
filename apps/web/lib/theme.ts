@@ -375,3 +375,35 @@ export function isColorMode(value: unknown): value is ColorMode {
 export function hexToNumber(color: string): number {
   return /^#[0-9a-f]{6}$/i.test(color) ? Number.parseInt(color.slice(1), 16) : 0x888888;
 }
+
+/**
+ * Auto mode follows the local clock in the browser's detected timezone (not the OS setting):
+ * light from AUTO_LIGHT_FROM_HOUR (inclusive) until AUTO_DARK_FROM_HOUR, dark otherwise.
+ */
+export const AUTO_LIGHT_FROM_HOUR = 7;
+export const AUTO_DARK_FROM_HOUR = 19;
+
+export function resolveAutoMode(now: Date): ResolvedMode {
+  const hour = now.getHours();
+  return hour >= AUTO_LIGHT_FROM_HOUR && hour < AUTO_DARK_FROM_HOUR ? "light" : "dark";
+}
+
+/** Next local 07:00 or 19:00 strictly after `now` (DST-safe: built from local calendar fields). */
+export function nextAutoSwitch(now: Date): Date {
+  const at = (dayOffset: number, hour: number) =>
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour, 0, 0, 0);
+  const today = [at(0, AUTO_LIGHT_FROM_HOUR), at(0, AUTO_DARK_FROM_HOUR)];
+  return today.find((c) => c.getTime() > now.getTime()) ?? at(1, AUTO_LIGHT_FROM_HOUR);
+}
+
+/** IANA timezone of the browser, e.g. "Europe/Berlin". */
+export function detectTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+  } catch {
+    return "local time";
+  }
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+export const AUTO_SCHEDULE_LABEL = `light ${pad(AUTO_LIGHT_FROM_HOUR)}:00–${pad(AUTO_DARK_FROM_HOUR)}:00, dark ${pad(AUTO_DARK_FROM_HOUR)}:00–${pad(AUTO_LIGHT_FROM_HOUR)}:00`;

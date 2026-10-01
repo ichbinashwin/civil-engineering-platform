@@ -261,8 +261,11 @@ body {
 .col.col-empty {
   display: contents;
 }
-.workspace.has-rail {
+.workspace.has-rail-right {
   padding-right: 74px;
+}
+.workspace.has-rail-left {
+  padding-left: 74px;
 }
 .panel {
   background: var(--panel);
@@ -386,6 +389,11 @@ body {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
   animation: pane-in 0.14s ease-out;
 }
+.pane.peek.side-left {
+  right: auto;
+  left: 66px;
+  animation-name: pane-in-left;
+}
 .pane.peek .pane-head {
   position: sticky;
   top: 0;
@@ -396,6 +404,16 @@ body {
   from {
     opacity: 0;
     transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pane-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
   }
   to {
     opacity: 1;
@@ -422,6 +440,12 @@ body {
   gap: 6px;
   padding: 12px 0;
   overflow-y: auto;
+}
+.dock-rail.left {
+  right: auto;
+  left: 0;
+  border-left: 0;
+  border-right: 1px solid var(--line);
 }
 .dock-btn {
   width: 40px;
@@ -955,7 +979,9 @@ details.trace summary {
     width: auto !important;
     max-height: none;
   }
-  .workspace.has-rail {
+  .workspace.has-rail-left,
+  .workspace.has-rail-right {
+    padding-left: 22px;
     padding-right: 22px;
   }
 }
