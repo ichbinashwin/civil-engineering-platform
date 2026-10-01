@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { CalculationWarning, PunchingShearInput } from "@civil/shared-types";
+import type {
+  CalculationWarning,
+  PunchingShearInput,
+  PunchingShearInputEC2,
+} from "@civil/shared-types";
 
 /**
  * Structural (shape) schema for two-way punching shear input in canonical units
@@ -135,4 +139,107 @@ export function validatePunchingInput(raw: unknown): PunchingValidation {
   });
 
   return hasErrors(issues) ? { ok: false, issues } : { ok: true, input, issues };
+}
+
+// ── Eurocode 2 (EN 1992-1-1) ────────────────────────────────────────────────────────────────────
+
+/** Lowest / highest concrete strength class of EN 1992-1-1 Table 3.1 (fck, MPa). */
+const EC2_FCK_MIN = 12;
+const EC2_FCK_MAX = 90;
+/** Reinforcement ratio above which ρl is capped (EN 1992-1-1 §6.4.4(1)). */
+const EC2_RHO_CAP = 0.02;
+
+export const PunchingInputEC2Schema = z.object({
+  VEd: z.number().nonnegative(),
+  MEdx: z.number(),
+  MEdy: z.number(),
+  column: z.object({
+    c1: z.number().positive(),
+    c2: z.number().positive(),
+  }),
+  d: z.number().positive(),
+  slabThickness: z.number().positive(),
+  fck: z.number().positive(),
+  rhoLx: z.number().nonnegative(),
+  rhoLy: z.number().nonnegative(),
+  openings: z.array(OpeningSchema).max(50),
+  columnLocation: z.enum(["interior", "edge", "corner"]),
+  punchingReinforcement: z.enum(["none", "studRails", "stirrups"]),
+});
+
+export type PunchingValidationEC2 =
+  | { ok: true; input: PunchingShearInputEC2; issues: CalculationWarning[] }
+  | { ok: false; issues: CalculationWarning[] };
+
+export function validatePunchingInputEC2(raw: unknown): PunchingValidationEC2 {
+  const parsed = PunchingInputEC2Schema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.error.issues.map((issue) => ({
+        severity: "ERROR",
+        code: "INVALID_INPUT",
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    };
+  }
+
+  const input = raw as PunchingShearInputEC2;
+  const issues: CalculationWarning[] = [];
+  const error = (code: string, field: string, message: string) =>
+    issues.push({ severity: "ERROR", code, field, message });
+
+  if (input.d >= input.slabThickness) {
+    error("D_EXCEEDS_H", "d", "Effective depth d must be less than slab thickness h.");
+  }
+  if (!(input.VEd > 0)) {
+    error(
+      "VED_NOT_POSITIVE",
+      "VEd",
+      "VEd must be greater than zero (the eccentricity MEd/VEd is undefined otherwise).",
+    );
+  }
+  if (input.fck < EC2_FCK_MIN || input.fck > EC2_FCK_MAX) {
+    error(
+      "FCK_OUT_OF_RANGE",
+      "fck",
+      `fck = ${input.fck} MPa is outside the concrete classes C12/15 to C90/105 (EN 1992-1-1 Table 3.1).`,
+    );
+  }
+  if (input.columnLocation !== "interior") {
+    error(
+      "UNSUPPORTED_COLUMN_LOCATION",
+      "columnLocation",
+      `Column location "${input.columnLocation}" is not implemented. Only interior columns are supported.`,
+    );
+  }
+  if (input.punchingReinforcement !== "none") {
+    error(
+      "UNSUPPORTED_REINFORCEMENT",
+      "punchingReinforcement",
+      "Punching shear reinforcement is not implemented. Only slabs without shear reinforcement are supported.",
+    );
+  }
+  input.openings.forEach((opening, index) => {
+    if (Math.hypot(opening.centerX, opening.centerY) === 0) {
+      error(
+        "OPENING_AT_COLUMN_CENTROID",
+        `openings.${index}`,
+        `Opening ${index + 1} is centered on the column centroid.`,
+      );
+    }
+  });
+
+  if (issues.length > 0) return { ok: false, issues };
+
+  if (input.rhoLx > EC2_RHO_CAP || input.rhoLy > EC2_RHO_CAP) {
+    issues.push({
+      severity: "INFO",
+      code: "RHO_ABOVE_CAP",
+      field: "rhoLx",
+      message: `A reinforcement ratio above ${EC2_RHO_CAP * 100} % is entered; ρl is capped at ${EC2_RHO_CAP * 100} % (EN 1992-1-1 §6.4.4(1)).`,
+    });
+  }
+  return { ok: true, input, issues };
 }

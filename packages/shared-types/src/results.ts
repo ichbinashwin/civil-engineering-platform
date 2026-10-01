@@ -113,3 +113,36 @@ export interface CalculationUnavailable {
 }
 
 export type PunchingShearOutcome = PunchingShearResult | CalculationUnavailable;
+
+/**
+ * What the plan and 3D views need from a punching result of any code. Both the ACI and the
+ * Eurocode result satisfy it, so the views are code-agnostic.
+ */
+export interface PunchingVizSource {
+  ok: true;
+  geometry: {
+    sizeX: number;
+    sizeY: number;
+    openingReductions: { openingIndex: number; reduction: number; applied: boolean }[];
+    effectivePerimeter: number;
+    centroidX: number;
+    centroidY: number;
+    segments: SegmentDto[];
+    openingShadows: {
+      openingIndex: number;
+      tangentStart: { x: number; y: number };
+      tangentEnd: { x: number; y: number };
+      removedSegments: SegmentDto[];
+    }[];
+    /** Gross control perimeter outline when it is not a plain rectangle (Eurocode: rounded corners). */
+    grossOutline?: { x: number; y: number }[];
+  };
+  demand: {
+    maximumShearStress: number;
+    criticalPoint: PunchingCriticalPoint;
+    stressProfile: PunchingCriticalPoint[][];
+  };
+  capacity: { designStrength: number };
+}
+
+export type PunchingVizOutcome = PunchingVizSource | CalculationUnavailable;

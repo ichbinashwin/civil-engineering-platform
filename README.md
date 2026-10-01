@@ -99,10 +99,10 @@ Every result exposes each step's formula, substituted values, result, unit and A
 
 ## Supported codes
 
-| Code                                       | Status                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------- |
-| ACI 318-19                                 | Punching shear (interior column)                                    |
-| ACI 318-14 / 318-25, Eurocode 2, CSA A23.3 | Architecture-ready (`engineering-core/src/codes/`), not implemented |
+| Code                           | Status                                                              |
+| ------------------------------ | ------------------------------------------------------------------- |
+| ACI 318-19                     | Punching shear (interior column)                                    |
+| ACI 318-14 / 318-25, CSA A23.3 | Architecture-ready (`engineering-core/src/codes/`), not implemented |
 
 ## Calculation verification
 
