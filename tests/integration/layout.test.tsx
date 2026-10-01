@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Workspace } from "@/components/workspace/Workspace";
 import { PANE_IDS, PANE_STORAGE_KEY, PANES } from "@/lib/panes";
 
@@ -135,5 +136,66 @@ describe("collapsible and dockable dashboard panes", () => {
     window.localStorage.setItem(PANE_STORAGE_KEY, '{"docked":["nope",7],"collapsed":"x"}');
     render(<Workspace />);
     expect(screen.queryByRole("navigation", { name: /Docked panels/ })).toBeNull();
+  });
+
+  describe("sidebar icons peek on hover as well as click", () => {
+    afterEach(() => vi.useRealTimers());
+
+    const dockInputs = () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Move Design Inputs to the left sidebar" }),
+      );
+      return screen.getByRole("button", { name: /Design Inputs \(in left sidebar\)/ });
+    };
+
+    it("hover opens the same flyout; leaving closes it after a short delay", () => {
+      render(<Workspace />);
+      vi.useFakeTimers();
+      const icon = dockInputs();
+      fireEvent.mouseEnter(icon);
+      expect(pane("Design Inputs").className).toContain("peek");
+      expect(pane("Design Inputs").getAttribute("data-pinned")).toBe("false");
+
+      fireEvent.mouseLeave(icon);
+      expect(pane("Design Inputs").className).toContain("peek"); // grace period
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(pane("Design Inputs").className).not.toContain("peek");
+    });
+
+    it("moving the pointer from the icon onto the flyout keeps it open", () => {
+      render(<Workspace />);
+      vi.useFakeTimers();
+      const icon = dockInputs();
+      fireEvent.mouseEnter(icon);
+      fireEvent.mouseLeave(icon);
+      fireEvent.mouseEnter(pane("Design Inputs")); // pointer arrives within the grace period
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(pane("Design Inputs").className).toContain("peek");
+      fireEvent.mouseLeave(pane("Design Inputs"));
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      expect(pane("Design Inputs").className).not.toContain("peek");
+    });
+
+    it("click pins the flyout: it survives mouse-leave until clicked again", () => {
+      render(<Workspace />);
+      vi.useFakeTimers();
+      const icon = dockInputs();
+      fireEvent.mouseEnter(icon);
+      fireEvent.click(icon);
+      expect(pane("Design Inputs").getAttribute("data-pinned")).toBe("true");
+      fireEvent.mouseLeave(icon);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(pane("Design Inputs").className).toContain("peek");
+      fireEvent.click(icon);
+      expect(pane("Design Inputs").className).not.toContain("peek");
+    });
   });
 });

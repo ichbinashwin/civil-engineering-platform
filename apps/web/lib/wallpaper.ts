@@ -6,16 +6,18 @@
  */
 
 const TILE = 520;
-const GRID = 6;
+const GRID = 10;
 const CELL = TILE / GRID;
 const ICON_BOX = 48;
 /** Max centre offset from the cell centre, keeps every doodle inside its cell so the tile is seamless. */
-const JITTER = 12;
-const MAX_ROTATION_DEG = 24;
-const MIN_SCALE = 0.85;
-const MAX_SCALE = 1.1;
-const EMOJI_SIZE = 30;
-const STROKE_WIDTH = 1.8;
+const JITTER = 9;
+const MAX_ROTATION_DEG = 28;
+/** Icons are drawn small (~26-31 px) like a chat wallpaper; the 48-unit icon boxes are scaled down. */
+const MIN_SCALE = 0.52;
+const MAX_SCALE = 0.64;
+const EMOJI_SIZE = 17;
+/** Stroke width in icon units (renders ~1.3 px after scaling). */
+const STROKE_WIDTH = 2.4;
 const SEED = 20260930;
 
 /** 48×48 outline icons (stroke only). */
@@ -110,7 +112,7 @@ export function buildWallpaperSvg({ color, lineOpacity, emojiOpacity }: Wallpape
   const emojis: string[] = [];
 
   /** Doodles within this distance of a tile edge are drawn again on the opposite side (seamless wrap). */
-  const WRAP_MARGIN = ICON_BOX;
+  const WRAP_MARGIN = ICON_BOX * MAX_SCALE;
 
   sequence.forEach((doodle, i) => {
     const row = Math.floor(i / GRID);
@@ -126,7 +128,8 @@ export function buildWallpaperSvg({ color, lineOpacity, emojiOpacity }: Wallpape
     if (x < WRAP_MARGIN) xs.push(x + TILE);
     if (x > TILE - WRAP_MARGIN) xs.push(x - TILE);
     xs.forEach((cx, copy) => {
-      const place = `translate(${cx.toFixed(1)} ${y.toFixed(1)}) rotate(${rotation.toFixed(1)}) scale(${scale.toFixed(2)})`;
+      const move = `translate(${cx.toFixed(1)} ${y.toFixed(1)}) rotate(${rotation.toFixed(1)})`;
+      const place = `${move} scale(${scale.toFixed(2)})`;
       const mark = copy > 0 ? ' data-copy="1"' : "";
       if (doodle.kind === "icon") {
         lines.push(
@@ -134,7 +137,7 @@ export function buildWallpaperSvg({ color, lineOpacity, emojiOpacity }: Wallpape
         );
       } else {
         emojis.push(
-          `<text${mark} transform="${place}" text-anchor="middle" dominant-baseline="central" font-size="${EMOJI_SIZE}">${doodle.glyph}</text>`,
+          `<text${mark} transform="${move}" text-anchor="middle" dominant-baseline="central" font-size="${EMOJI_SIZE}">${doodle.glyph}</text>`,
         );
       }
     });

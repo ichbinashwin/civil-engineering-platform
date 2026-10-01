@@ -11,7 +11,8 @@ import { usePaneLayout } from "./PaneLayout";
  * Esc or a click outside closes it. Hidden while nothing is docked on this side.
  */
 export function DockRail({ side }: { side: DockSide }) {
-  const { dockedOn, peek, setPeek, restoreSide } = usePaneLayout();
+  const { dockedOn, peek, peekPinned, setPeek, restoreSide, hoverEnter, hoverLeave, togglePinned } =
+    usePaneLayout();
   const ids = dockedOn(side);
   const peekingHere = peek !== null && PANES[peek].side === side && ids.includes(peek);
 
@@ -27,7 +28,7 @@ export function DockRail({ side }: { side: DockSide }) {
   if (ids.length === 0) return null;
   return (
     <>
-      {peekingHere && (
+      {peekingHere && peekPinned && (
         <div className="dock-backdrop" onClick={() => setPeek(null)} aria-hidden="true" />
       )}
       <nav className={`dock-rail ${side} no-print`} aria-label={`Docked panels, ${side} sidebar`}>
@@ -38,10 +39,14 @@ export function DockRail({ side }: { side: DockSide }) {
               key={id}
               type="button"
               className="dock-btn"
-              aria-pressed={open}
+              aria-pressed={open && peekPinned}
               title={PANES[id].title}
-              aria-label={`${PANES[id].title} (in ${side} sidebar) — ${open ? "close" : "open"}`}
-              onClick={() => setPeek(open ? null : id)}
+              aria-label={`${PANES[id].title} (in ${side} sidebar) — ${open && peekPinned ? "close" : "open"}`}
+              onMouseEnter={() => hoverEnter(id)}
+              onMouseLeave={hoverLeave}
+              onFocus={() => hoverEnter(id)}
+              onBlur={hoverLeave}
+              onClick={() => togglePinned(id)}
             >
               <Icon name={PANES[id].icon} size={20} />
             </button>

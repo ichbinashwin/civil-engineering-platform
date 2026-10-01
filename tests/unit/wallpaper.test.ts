@@ -33,6 +33,17 @@ describe("engineering doodle wallpaper", () => {
     expect(emojis).toBeGreaterThan(3);
   });
 
+  it("doodles are small like a chat wallpaper", () => {
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const scales = [...doc.querySelectorAll("g[stroke] > g")].map((g) =>
+      Number(/scale\(([\d.]+)\)/.exec(g.getAttribute("transform") ?? "")?.[1]),
+    );
+    expect(Math.max(...scales) * 48).toBeLessThanOrEqual(32); // icon box 48 units -> at most ~32 px
+    const sizes = [...doc.querySelectorAll("text")].map((t) => Number(t.getAttribute("font-size")));
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(18);
+    expect(WALLPAPER_DOODLE_COUNT).toBeGreaterThanOrEqual(80);
+  });
+
   it("is seamless: doodles near an edge are repeated on the opposite edge", () => {
     const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
     expect(doc.querySelectorAll("[data-copy]").length).toBeGreaterThan(0);

@@ -22,7 +22,18 @@ interface PaneProps {
  * icon is clicked. Children are never unmounted by collapsing or docking.
  */
 export function Pane({ id, badge, flush = false, children }: PaneProps) {
-  const { isCollapsed, isDocked, peek, toggleCollapsed, dock, restore, setPeek } = usePaneLayout();
+  const {
+    isCollapsed,
+    isDocked,
+    peek,
+    peekPinned,
+    toggleCollapsed,
+    dock,
+    restore,
+    setPeek,
+    hoverKeep,
+    hoverLeave,
+  } = usePaneLayout();
   const def = PANES[id];
   const headId = useId();
   const bodyId = useId();
@@ -37,6 +48,9 @@ export function Pane({ id, badge, flush = false, children }: PaneProps) {
       data-pane={id}
       style={peeking ? { width: `min(${def.flyoutWidth}px, calc(100vw - 84px))` } : undefined}
       data-side={def.side}
+      data-pinned={peeking ? String(peekPinned) : undefined}
+      onMouseEnter={peeking ? hoverKeep : undefined}
+      onMouseLeave={peeking ? hoverLeave : undefined}
     >
       <header className="pane-head">
         <h2 id={headId} className="pane-title">

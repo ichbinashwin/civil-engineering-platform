@@ -80,3 +80,6 @@ else console.log(outcome.reason, outcome.action);
   icons (I-beam, truss, bridge, crane, hard hat, rebar section, rulers …) and greyed emojis (👷 🏗️ 🧱 📐 🌉 …),
   recoloured per theme and mode. The header _Wallpaper_ button turns it off and on; printing never includes it.
   Generator: `apps/web/lib/wallpaper.ts`.
+- **Sidebar hover:** pointing at a sidebar icon opens the same flyout as a click; it closes shortly after the pointer
+  leaves both the icon and the flyout. A click _pins_ it open (until clicked again, Esc, or a click outside).
+  The wallpaper doodles are small (about 26–30 px) like a chat wallpaper.
