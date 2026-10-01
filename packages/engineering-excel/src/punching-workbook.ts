@@ -246,6 +246,14 @@ function buildInputs(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, refs: Cell
       "",
       "§22.5.5.1.3; FALSE = non-conforming legacy option",
     ],
+    [
+      "signConv",
+      "Moment sign convention",
+      "",
+      input.options?.momentSignConvention ?? "envelope",
+      "",
+      "envelope = |vux| + |vuy| (conservative); signed = moments with entered sign",
+    ],
   ];
   let r = 5;
   for (const [key, label, symbol, value, unit, note, fmt] of rows) {
@@ -417,6 +425,15 @@ function buildGeometry(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, refs: Ce
       ref: "R8.4.4.2.3",
       numFmt: NUMBER_FORMATS.integer,
     },
+    {
+      key: "Jxy",
+      label: "Product of inertia (0 if symmetric)",
+      symbol: "Jxy",
+      engine: g.Jxy,
+      unit: "in⁴",
+      ref: "8.4.4.2",
+      numFmt: NUMBER_FORMATS.one,
+    },
   ];
   const end = writeCalcTable(ws, 4, rows, refs);
   noteRow(
@@ -459,11 +476,14 @@ function buildPunching(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, refs: Ce
   titleBand(
     ws,
     "Punching shear demand",
-    "vu = Vu/(bo d) + γvx|Mux||y − ȳ|/Jx + γvy|Muy||x − x̄|/Jy at the critical point (sign envelope) — §8.4.4.2",
+    "vu = Vu/(bo d) + γvx Mux[Jy(y−ȳ) − Jxy(x−x̄)]/(JxJy − Jxy²) + γvy Muy[Jx(x−x̄) − Jxy(y−ȳ)]/(JxJy − Jxy²) at the critical point — §8.4.4.2",
     7,
   );
   const dm = p.result.demand;
   const k = ACI318_19.momentTransfer.gammaFCoefficient;
+  const signed = p.input.options?.momentSignConvention === "signed";
+  // General biaxial form with product of inertia; envelope takes the absolute value of each term.
+  const wrapSign = (expr: string) => (signed ? expr : `ABS(${expr})`);
   const rows: CalcRow[] = [
     {
       key: "gvx",
@@ -547,7 +567,9 @@ function buildPunching(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, refs: Ce
       key: "vux",
       label: "Shear stress from Mux",
       symbol: "vux",
-      formula: "{gvx}*ABS({MuxLbIn})*ABS({ycrit}-{yc})/{Jx}",
+      formula: wrapSign(
+        "{gvx}*{MuxLbIn}*({Jy}*({ycrit}-{yc})-{Jxy}*({xcrit}-{xc}))/({Jx}*{Jy}-{Jxy}*{Jxy})",
+      ),
       engine: dm.momentX,
       unit: "psi",
       ref: "8.4.4.2",
@@ -557,7 +579,9 @@ function buildPunching(wb: ExcelJS.Workbook, p: PunchingWorkbookParams, refs: Ce
       key: "vuy",
       label: "Shear stress from Muy",
       symbol: "vuy",
-      formula: "{gvy}*ABS({MuyLbIn})*ABS({xcrit}-{xc})/{Jy}",
+      formula: wrapSign(
+        "{gvy}*{MuyLbIn}*({Jx}*({xcrit}-{xc})-{Jxy}*({ycrit}-{yc}))/({Jx}*{Jy}-{Jxy}*{Jxy})",
+      ),
       engine: dm.momentY,
       unit: "psi",
       ref: "8.4.4.2",

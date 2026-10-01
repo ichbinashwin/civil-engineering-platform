@@ -39,6 +39,7 @@ export interface FormState {
   columnLocation: ColumnLocation;
   reinforcement: PunchingReinforcement;
   applySizeEffect: boolean;
+  momentSign: "envelope" | "signed";
   openings: OpeningForm[];
 }
 
@@ -71,6 +72,7 @@ export const EXAMPLE_FORM: FormState = {
   columnLocation: "interior",
   reinforcement: "none",
   applySizeEffect: true,
+  momentSign: "envelope",
   openings: [
     { key: "ref-o1", type: "circle", x: "-47", y: "10", diameter: "3", width: "3", height: "3" },
     { key: "ref-o2", type: "circle", x: "-30", y: "45", diameter: "2", width: "2", height: "2" },
@@ -103,7 +105,7 @@ export function toEngineInput(form: FormState): PunchingShearInput {
     openings: form.openings.map(toOpening),
     columnLocation: form.columnLocation,
     punchingReinforcement: form.reinforcement,
-    options: { applySizeEffectFactor: form.applySizeEffect },
+    options: { applySizeEffectFactor: form.applySizeEffect, momentSignConvention: form.momentSign },
   };
 }
 

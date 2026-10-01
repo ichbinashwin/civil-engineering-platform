@@ -84,4 +84,11 @@ export interface PunchingShearOptions {
    * lambda_s; the result then carries a non-conformance WARNING.
    */
   applySizeEffectFactor?: boolean;
+  /**
+   * How moment signs are treated in vu = Vu/(bo d) + moment terms:
+   * - "envelope" (default): worst sign of each moment at every point, |term x| + |term y| (conservative).
+   * - "signed": moments act with their entered sign; positive Mux increases stress on the +y side,
+   *   positive Muy on the +x side.
+   */
+  momentSignConvention?: "envelope" | "signed";
 }

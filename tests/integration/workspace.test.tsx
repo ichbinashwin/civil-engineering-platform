@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { calculatePunchingShear } from "@civil/engineering-core";
 import { Workspace } from "@/components/workspace/Workspace";
+import { EXAMPLE_FORM, toEngineInput } from "@/lib/form";
+
+/** Expected DCR label computed by the engine itself (UI must display the engine value). */
+function dcrLabel(overrides: Partial<typeof EXAMPLE_FORM> = {}): string {
+  const r = calculatePunchingShear(toEngineInput({ ...EXAMPLE_FORM, ...overrides }));
+  if (!r.ok) throw new Error(r.reason);
+  return `DCR ${r.dcr.toFixed(3)}`;
+}
 
 describe("engineering workspace (human in the loop)", () => {
   beforeEach(() => window.localStorage.clear());
@@ -9,14 +18,14 @@ describe("engineering workspace (human in the loop)", () => {
 
   it("renders the reference case with DCR and PASS as text", () => {
     render(<Workspace />);
-    expect(screen.getByLabelText("DCR 0.895")).toBeTruthy();
+    expect(screen.getByLabelText(dcrLabel())).toBeTruthy();
     expect(screen.getAllByText("PASS").length).toBeGreaterThan(0);
   });
 
   it("recalculates live when an input changes", () => {
     render(<Workspace />);
     fireEvent.change(screen.getByLabelText("Vu (factored shear)"), { target: { value: "400" } });
-    expect(screen.getByLabelText("DCR 1.169")).toBeTruthy();
+    expect(screen.getByLabelText(dcrLabel({ Vu: "400" }))).toBeTruthy();
     expect(screen.getAllByText("FAIL").length).toBeGreaterThan(0);
   });
 

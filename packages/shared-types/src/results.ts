@@ -64,6 +64,9 @@ export interface PunchingShearResult {
     Iy: number;
     Jx: number;
     Jy: number;
+    /** Product of inertia of the effective section (line, in^3) and d·Ixy (in^4). Zero if symmetric. */
+    Ixy: number;
+    Jxy: number;
     segments: SegmentDto[];
     /** Tangent-line intersections with bo and the ineffective portion per opening (§22.6.4.3). */
     openingShadows: {

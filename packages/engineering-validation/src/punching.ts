@@ -48,6 +48,7 @@ export const PunchingInputSchema = z.object({
   options: z
     .object({
       applySizeEffectFactor: z.boolean().optional(),
+      momentSignConvention: z.enum(["envelope", "signed"]).optional(),
     })
     .optional(),
 });

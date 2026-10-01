@@ -37,8 +37,9 @@ export const PUNCHING_METHOD =
   "ACI 318-19 two-way shear, interior rectangular column, no shear reinforcement. " +
   "Critical section at d/2 (§22.6.4.1). Opening shadows by tangent lines from the column centroid (§22.6.4.3), " +
   "overlapping shadows merged. Section properties of the effective (reduced) perimeter about its own centroid. " +
-  "Shear stress vu = Vu/(bo d) + gamma_vx |Mux| |y - yc| / Jx + gamma_vy |Muy| |x - xc| / Jy evaluated at every " +
-  "effective-segment end point (sign envelope, §8.4.4.2). gamma_v from gross critical-section b1/b2 (§8.4.2.2.2).";
+  "Shear stress vu = Vu/(bo d) + gamma_vx Mux [Jy(y-yc) - Jxy(x-xc)]/(Jx Jy - Jxy^2) + gamma_vy Muy [Jx(x-xc) - Jxy(y-yc)]/(Jx Jy - Jxy^2) " +
+  "evaluated at every effective-segment end point (§8.4.4.2; general biaxial form as CSI SAFE/ETABS and ACI 421.1R). " +
+  "Moment signs: envelope (|term x| + |term y|, default) or signed (option). gamma_v from gross critical-section b1/b2 (§8.4.2.2.2).";
 
 /**
  * Software review threshold, not a code provision: openings whose edge is within this
@@ -239,6 +240,15 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
     unit: "in^4",
     reference: REFS.shearStressFromMoment,
   });
+  steps.push({
+    id: "jxy",
+    title: "Jxy (product of inertia)",
+    formula: "Jxy = d sum(L/6 (2 xa ya + xa yb + xb ya + 2 xb yb))  (0 for a symmetric section)",
+    substitution: `Jxy = ${fmt(d)}(${fmt(props.Ixy, 3)})`,
+    value: props.Jxy,
+    unit: "in^4",
+    reference: REFS.shearStressFromMoment,
+  });
 
   if (Math.hypot(props.centroidX, props.centroidY) > 1e-6) {
     warnings.push({
@@ -258,9 +268,19 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
   const gammaVy = momentTransferFractionShear(sizeX, sizeY);
   const directShear = Vu / (bo * d);
 
+  // General biaxial formula with product of inertia (CSI SAFE/ETABS; ACI 421.1R):
+  //   vux = γvx Mux [Jy (y - yc) - Jxy (x - xc)] / (Jx Jy - Jxy²)
+  //   vuy = γvy Muy [Jx (x - xc) - Jxy (y - yc)] / (Jx Jy - Jxy²)
+  // Reduces to γv M c / Jc when Jxy = 0 (symmetric section).
+  const signed = input.options?.momentSignConvention === "signed";
+  const det = props.Jx * props.Jy - props.Jxy * props.Jxy;
   const stressAt = (x: number, y: number) => {
-    const momentX = (gammaVx * Math.abs(Mux) * Math.abs(y - props.centroidY)) / props.Jx;
-    const momentY = (gammaVy * Math.abs(Muy) * Math.abs(x - props.centroidX)) / props.Jy;
+    const dx = x - props.centroidX;
+    const dy = y - props.centroidY;
+    const termX = (gammaVx * Mux * (props.Jy * dy - props.Jxy * dx)) / det;
+    const termY = (gammaVy * Muy * (props.Jx * dx - props.Jxy * dy)) / det;
+    const momentX = signed ? termX : Math.abs(termX);
+    const momentY = signed ? termY : Math.abs(termY);
     return { x, y, momentX, momentY, stress: directShear + momentX + momentY };
   };
 
@@ -319,8 +339,10 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
   steps.push({
     id: "moment-shear-x",
     title: "Shear stress from Mux at critical point",
-    formula: "vux = gamma_vx |Mux| |y - yc| / Jx",
-    substitution: `vux = ${fmt(gammaVx, 4)} × ${fmt(Math.abs(Mux))} × ${fmt(Math.abs(critical.y - props.centroidY))} / ${fmt(props.Jx, 0)}`,
+    formula: signed
+      ? "vux = gamma_vx Mux [Jy (y - yc) - Jxy (x - xc)] / (Jx Jy - Jxy^2)"
+      : "vux = |gamma_vx Mux [Jy (y - yc) - Jxy (x - xc)] / (Jx Jy - Jxy^2)|  (sign envelope)",
+    substitution: `vux = ${fmt(gammaVx, 4)} × ${fmt(Mux)} × [${fmt(props.Jy, 0)} × ${fmt(critical.y - props.centroidY)} - ${fmt(props.Jxy, 1)} × ${fmt(critical.x - props.centroidX)}] / (${fmt(props.Jx, 0)} × ${fmt(props.Jy, 0)} - ${fmt(props.Jxy, 1)}²)`,
     value: critical.momentX,
     unit: "psi",
     reference: REFS.shearStressFromMoment,
@@ -328,8 +350,10 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
   steps.push({
     id: "moment-shear-y",
     title: "Shear stress from Muy at critical point",
-    formula: "vuy = gamma_vy |Muy| |x - xc| / Jy",
-    substitution: `vuy = ${fmt(gammaVy, 4)} × ${fmt(Math.abs(Muy))} × ${fmt(Math.abs(critical.x - props.centroidX))} / ${fmt(props.Jy, 0)}`,
+    formula: signed
+      ? "vuy = gamma_vy Muy [Jx (x - xc) - Jxy (y - yc)] / (Jx Jy - Jxy^2)"
+      : "vuy = |gamma_vy Muy [Jx (x - xc) - Jxy (y - yc)] / (Jx Jy - Jxy^2)|  (sign envelope)",
+    substitution: `vuy = ${fmt(gammaVy, 4)} × ${fmt(Muy)} × [${fmt(props.Jx, 0)} × ${fmt(critical.x - props.centroidX)} - ${fmt(props.Jxy, 1)} × ${fmt(critical.y - props.centroidY)}] / (${fmt(props.Jx, 0)} × ${fmt(props.Jy, 0)} - ${fmt(props.Jxy, 1)}²)`,
     value: critical.momentY,
     unit: "psi",
     reference: REFS.shearStressFromMoment,
@@ -436,7 +460,17 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
     reference: REFS.twoWayShear,
   });
 
-  const numericChecks = [bo, props.Jx, props.Jy, directShear, critical.stress, designStrength, dcr];
+  const numericChecks = [
+    bo,
+    props.Jx,
+    props.Jy,
+    props.Jxy,
+    det,
+    directShear,
+    critical.stress,
+    designStrength,
+    dcr,
+  ];
   if (!allFinite(numericChecks) || bo <= 0 || designStrength <= 0) {
     return unavailable(
       "Calculation produced a non-finite or non-positive intermediate value.",
@@ -470,6 +504,8 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
       Iy: props.Iy,
       Jx: props.Jx,
       Jy: props.Jy,
+      Ixy: props.Ixy,
+      Jxy: props.Jxy,
       segments: segments.map(toSegmentDto),
       openingShadows,
     },

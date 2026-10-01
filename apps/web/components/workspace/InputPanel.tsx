@@ -39,6 +39,7 @@ export function InputPanel({
     rev: useId(),
     loc: useId(),
     reinf: useId(),
+    sign: useId(),
   };
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     onChange({ ...form, [key]: value });
@@ -261,6 +262,23 @@ export function InputPanel({
               <option value="none">None</option>
               <option value="studRails">Stud rails (not implemented)</option>
               <option value="stirrups">Stirrups (not implemented)</option>
+            </select>
+          </div>
+          <div className="row wide">
+            <label
+              htmlFor={ids.sign}
+              title="Envelope: worst sign of each moment (conservative). Signed: positive Mux raises stress on +y, positive Muy on +x."
+            >
+              Moment signs
+            </label>
+            <select
+              id={ids.sign}
+              className="input"
+              value={form.momentSign}
+              onChange={(e) => set("momentSign", e.target.value as FormState["momentSign"])}
+            >
+              <option value="envelope">Envelope (conservative)</option>
+              <option value="signed">Signed (as entered)</option>
             </select>
           </div>
           <label className="check">

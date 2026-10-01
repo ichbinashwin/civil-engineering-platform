@@ -53,6 +53,7 @@ export function ResultTables({ result }: { result: PunchingShearResult }) {
     ["Iy (line)", formatNumber(g.Iy, 0), "in³", ""],
     ["Jx", formatNumber(g.Jx, 0), "in⁴", "R8.4.4.2.3"],
     ["Jy", formatNumber(g.Jy, 0), "in⁴", "R8.4.4.2.3"],
+    ["Jxy (0 if symmetric)", formatNumber(g.Jxy, 1), "in⁴", "§8.4.4.2"],
   ];
   const demandRows: Row[] = [
     ["Direct shear vuv", formatNumber(dm.directShear, 2), "psi", "§8.4.4.2"],
