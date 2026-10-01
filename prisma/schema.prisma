@@ -1,0 +1,66 @@
+// Persistence model (Milestone 5). Schema only — Prisma client is not yet installed.
+// Calculation records are append-only: never update a stored result; create a new revision.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String             @id @default(uuid())
+  name        String
+  description String?
+  designCode  String             // e.g. "ACI 318-19"
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  members     StructuralMember[]
+}
+
+model StructuralMember {
+  id           String        @id @default(uuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id])
+  type         String        // slab | beam | column | footing | wall
+  name         String
+  calculations Calculation[]
+  createdAt    DateTime      @default(now())
+
+  @@index([projectId])
+}
+
+/// Immutable audit record of one calculation run.
+model Calculation {
+  id              String           @id @default(uuid())
+  memberId        String
+  member          StructuralMember @relation(fields: [memberId], references: [id])
+  module          String           // e.g. "punching-shear"
+  revision        Int
+  engineVersion   String
+  codeEdition     String
+  inputSnapshot   Json
+  resultSnapshot  Json
+  warnings        Json
+  status          String           // PASS | FAIL | WARNING | UNAVAILABLE
+  dcr             Float?
+  createdBy       String?
+  createdAt       DateTime         @default(now())
+
+  @@unique([memberId, module, revision])
+  @@index([memberId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actor     String?
+  action    String
+  entity    String
+  entityId  String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}

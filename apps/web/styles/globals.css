@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-ink: #1a1d21;
+  --color-muted: #5b6470;
+  --color-rule: #d5d9de;
+  --color-panel: #f6f7f9;
+  --color-pass: #1d6b3a;
+  --color-fail: #a4262c;
+  --color-warn: #8a5a00;
+}
+
+body {
+  color: var(--color-ink);
+  background: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid #1f5fbf;
+  outline-offset: 2px;
+}
