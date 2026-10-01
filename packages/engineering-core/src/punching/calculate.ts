@@ -17,6 +17,9 @@ import {
   openingCrossesPerimeter,
   openingDistanceToRectangle,
   openingOverlapsRectangle,
+  pointAt,
+  rayIntersection,
+  segmentsBetween,
   shadowIntervals,
 } from "../geometry";
 import type { PerimeterInterval, Segment } from "../geometry";
@@ -42,6 +45,14 @@ export const PUNCHING_METHOD =
  * fraction of d from the critical perimeter are flagged for engineer review.
  */
 const OPENING_PROXIMITY_REVIEW_FACTOR = 0.5;
+
+/** Sampling of the visualization stress profile along each effective segment. */
+const STRESS_PROFILE_SPACING_IN = 1;
+const STRESS_PROFILE_MAX_SAMPLES = 200;
+
+function toSegmentDto(s: Segment) {
+  return { x1: s.start.x, y1: s.start.y, x2: s.end.x, y2: s.end.y };
+}
 
 /** DCR limit for PASS. */
 const DCR_LIMIT = 1;
@@ -105,6 +116,7 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
   const influenceDistance = TWS.openingInfluenceHeightFactor * h;
   const removed: PerimeterInterval[] = [];
   const openingReductions: PunchingShearResult["geometry"]["openingReductions"] = [];
+  const openingShadows: PunchingShearResult["geometry"]["openingShadows"] = [];
 
   for (const [index, opening] of input.openings.entries()) {
     const label = `Opening ${index + 1}`;
@@ -128,6 +140,14 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
     const reduction = intervalLength(intervals);
     removed.push(...intervals);
     openingReductions.push({ openingIndex: index, reduction, applied: true });
+    openingShadows.push({
+      openingIndex: index,
+      tangentStart: pointAt(perimeter, rayIntersection(perimeter, span.from)),
+      tangentEnd: pointAt(perimeter, rayIntersection(perimeter, span.to)),
+      removedSegments: intervals
+        .flatMap((i) => segmentsBetween(perimeter, i.start, i.end))
+        .map(toSegmentDto),
+    });
 
     if (openingCrossesPerimeter(opening, perimeter)) {
       warnings.push({
@@ -238,15 +258,36 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
   const gammaVy = momentTransferFractionShear(sizeX, sizeY);
   const directShear = Vu / (bo * d);
 
+  const stressAt = (x: number, y: number) => {
+    const momentX = (gammaVx * Math.abs(Mux) * Math.abs(y - props.centroidY)) / props.Jx;
+    const momentY = (gammaVy * Math.abs(Muy) * Math.abs(x - props.centroidX)) / props.Jy;
+    return { x, y, momentX, momentY, stress: directShear + momentX + momentY };
+  };
+
+  // Stress varies piecewise-linearly along each segment, so the maximum occurs at an end point.
   let critical = { x: 0, y: 0, stress: Number.NEGATIVE_INFINITY, momentX: 0, momentY: 0 };
   for (const s of segments) {
     for (const p of [s.start, s.end]) {
-      const momentX = (gammaVx * Math.abs(Mux) * Math.abs(p.y - props.centroidY)) / props.Jx;
-      const momentY = (gammaVy * Math.abs(Muy) * Math.abs(p.x - props.centroidX)) / props.Jy;
-      const stress = directShear + momentX + momentY;
-      if (stress > critical.stress) critical = { x: p.x, y: p.y, stress, momentX, momentY };
+      const candidate = stressAt(p.x, p.y);
+      if (candidate.stress > critical.stress) critical = candidate;
     }
   }
+
+  // Sampled stress profile along the effective perimeter (for visualization only).
+  const stressProfile = segments.map((s) => {
+    const samples = Math.max(
+      2,
+      Math.min(STRESS_PROFILE_MAX_SAMPLES, Math.ceil(s.length / STRESS_PROFILE_SPACING_IN) + 1),
+    );
+    return Array.from({ length: samples }, (_, k) => {
+      const t = k / (samples - 1);
+      const p = stressAt(
+        s.start.x + (s.end.x - s.start.x) * t,
+        s.start.y + (s.end.y - s.start.y) * t,
+      );
+      return { x: p.x, y: p.y, stress: p.stress };
+    });
+  });
 
   steps.push({
     id: "gamma-vx",
@@ -415,6 +456,7 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
       gammaVx,
       gammaVy,
       criticalPoint: { x: critical.x, y: critical.y, stress: critical.stress },
+      stressProfile,
     },
     geometry: {
       sizeX,
@@ -428,7 +470,8 @@ export function calculatePunchingShear(rawInput: unknown): PunchingShearOutcome 
       Iy: props.Iy,
       Jx: props.Jx,
       Jy: props.Jy,
-      segments: segments.map((s) => ({ x1: s.start.x, y1: s.start.y, x2: s.end.x, y2: s.end.y })),
+      segments: segments.map(toSegmentDto),
+      openingShadows,
     },
     capacity: {
       lambda: input.concrete.lambda,

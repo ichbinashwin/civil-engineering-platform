@@ -23,6 +23,13 @@ export interface CalculationStep {
 
 export type CalculationStatus = "PASS" | "FAIL" | "WARNING";
 
+export interface SegmentDto {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export interface PunchingCriticalPoint {
   x: number;
   y: number;
@@ -40,6 +47,8 @@ export interface PunchingShearResult {
     gammaVx: number;
     gammaVy: number;
     criticalPoint: PunchingCriticalPoint;
+    /** Stress sampled along each effective segment (visualization; same formula as the check). */
+    stressProfile: PunchingCriticalPoint[][];
   };
   geometry: {
     /** Critical-section dimension along X: c1 + d (in). */
@@ -55,7 +64,14 @@ export interface PunchingShearResult {
     Iy: number;
     Jx: number;
     Jy: number;
-    segments: { x1: number; y1: number; x2: number; y2: number }[];
+    segments: SegmentDto[];
+    /** Tangent-line intersections with bo and the ineffective portion per opening (§22.6.4.3). */
+    openingShadows: {
+      openingIndex: number;
+      tangentStart: { x: number; y: number };
+      tangentEnd: { x: number; y: number };
+      removedSegments: SegmentDto[];
+    }[];
   };
   capacity: {
     lambda: number;

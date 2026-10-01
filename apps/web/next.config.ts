@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+/** React dev tooling needs eval(); production never allows it. */
+const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 /** Security headers (OWASP). CSP is tightened further once inline styles/scripts are audited. */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -9,8 +12,7 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   {
     key: "Content-Security-Policy",
-    value:
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    value: `default-src 'self'; script-src 'self' 'unsafe-inline'${devEval}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
   },
 ];
 
