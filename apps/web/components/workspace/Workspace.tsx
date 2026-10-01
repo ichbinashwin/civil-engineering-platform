@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { calculatePunchingShear } from "@civil/engineering-core";
 import { EXAMPLE_FORM, fieldMessages, toEngineInput } from "@/lib/form";
 import type { FormState } from "@/lib/form";
+import { ThemeControls } from "../theme/ThemeControls";
 import { VisualizationPanel } from "../viz/VisualizationPanel";
 import { CalculationTrace } from "./CalculationTrace";
 import { InputPanel } from "./InputPanel";
@@ -136,40 +137,43 @@ export function Workspace() {
               </div>
             </div>
           </div>
-          <div className="actions">
-            <button type="button" className="btn" onClick={() => window.print()}>
-              Print / PDF
-            </button>
-            <button
-              type="button"
-              className="btn excel"
-              onClick={exportExcel}
-              disabled={!outcome.ok || excelState === "busy"}
-              title={
-                outcome.ok
-                  ? "Formatted workbook: Summary, Inputs, Geometry, Punching, Capacity, Audit"
-                  : "Available when the calculation is valid"
-              }
-            >
-              {excelState === "busy"
-                ? "Exporting…"
-                : excelState === "error"
-                  ? "Excel failed — retry"
-                  : "Export Excel"}
-            </button>
-            <button type="button" className="btn" onClick={exportSnapshot}>
-              Export JSON
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={() => {
-                setForm(EXAMPLE_FORM);
-                setSelectedOpening(null);
-              }}
-            >
-              Reset example
-            </button>
+          <div className="topbar-right">
+            <ThemeControls />
+            <div className="actions">
+              <button type="button" className="btn" onClick={() => window.print()}>
+                Print / PDF
+              </button>
+              <button
+                type="button"
+                className="btn excel"
+                onClick={exportExcel}
+                disabled={!outcome.ok || excelState === "busy"}
+                title={
+                  outcome.ok
+                    ? "Formatted workbook: Summary, Inputs, Geometry, Punching, Capacity, Audit"
+                    : "Available when the calculation is valid"
+                }
+              >
+                {excelState === "busy"
+                  ? "Exporting…"
+                  : excelState === "error"
+                    ? "Excel failed — retry"
+                    : "Export Excel"}
+              </button>
+              <button type="button" className="btn" onClick={exportSnapshot}>
+                Export JSON
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  setForm(EXAMPLE_FORM);
+                  setSelectedOpening(null);
+                }}
+              >
+                Reset example
+              </button>
+            </div>
           </div>
         </div>
       </header>

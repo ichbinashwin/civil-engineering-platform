@@ -28,7 +28,7 @@ export default tseslint.config(
   },
   {
     // Tests assert preconditions explicitly; non-null assertions keep them readable.
-    files: ["tests/**/*.ts"],
+    files: ["tests/**/*.{ts,tsx}"],
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   },
   {
