@@ -1,0 +1,110 @@
+# Civil Engineering Platform
+
+Structural engineering calculation platform with transparent, auditable, code-referenced calculations.
+First module: **ACI 318-19 two-way punching shear** (interior column, no shear reinforcement, slab openings).
+
+> **Engineering disclaimer.** Results require review by a qualified engineer. Confirm code applicability and
+> project-specific conditions; additional checks may be required. This software does not replace professional
+> engineering judgment. Independently review results before issuing construction documents.
+
+## Feature status
+
+| Feature                                                                                   | Status                                                                                              |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| ACI 318-19 punching shear — interior rectangular column, no shear reinforcement, openings | **Experimental** — implemented and regression-tested; awaiting independent engineering verification |
+| Unit conversion library (US ↔ SI)                                                         | Experimental                                                                                        |
+| Interactive dashboard, SVG visualization                                                  | Planned (Milestones 2–3)                                                                            |
+| PDF report, Excel export                                                                  | Planned (Milestone 4)                                                                               |
+| Persistence, revisions, audit trail                                                       | Planned (Milestone 5) — schema in `prisma/`                                                         |
+| Authentication, sharing                                                                   | Planned (Milestone 6)                                                                               |
+| Edge/corner columns, shear reinforcement, other modules                                   | Planned                                                                                             |
+
+No feature is yet classified **Verified engineering calculation**; that requires sign-off recorded in `docs/verification/`.
+
+## Architecture
+
+```text
+apps/web                         Next.js UI (presentation only)
+packages/engineering-core        pure calculation engine, units, code constants, geometry
+packages/engineering-validation  Zod schemas + engineering-aware validation
+packages/shared-types            domain and result types
+packages/engineering-reporting   (planned) PDF
+packages/engineering-excel       (planned) Excel
+packages/ui                      (planned) shared components
+tests/{unit,integration,regression,e2e}
+docs/{architecture,engineering-basis,verification,user-guide}
+prisma/                          PostgreSQL schema
+docker/                          Dockerfile, docker-compose (Postgres)
+```
+
+Engineering formulas never live in UI code. See [docs/architecture/overview.md](docs/architecture/overview.md).
+
+## Technology stack
+
+TypeScript (strict) · pnpm workspaces · Turborepo · Next.js 16 · React 19 · Tailwind CSS 4 · Zod 4 · Vitest ·
+ESLint · Prettier · PostgreSQL + Prisma (planned) · Docker · GitHub Actions.
+
+## Installation (macOS)
+
+```bash
+brew install git node@24
+brew install --cask visual-studio-code docker
+corepack enable
+pnpm install
+```
+
+Full instructions: [docs/user-guide/getting-started.md](docs/user-guide/getting-started.md).
+
+## Development
+
+| Task                                     | Command                              |
+| ---------------------------------------- | ------------------------------------ |
+| Start dev server (http://localhost:3000) | `pnpm dev`                           |
+| Run all tests                            | `pnpm test`                          |
+| Engineering regression tests only        | `pnpm test:regression`               |
+| Lint                                     | `pnpm lint`                          |
+| Format                                   | `pnpm format`                        |
+| Typecheck                                | `pnpm typecheck`                     |
+| Production build                         | `pnpm build`                         |
+| Everything CI runs                       | `pnpm verify`                        |
+| Start PostgreSQL                         | `cp .env.example .env && pnpm db:up` |
+| Stop PostgreSQL                          | `pnpm db:down`                       |
+| Generate reports                         | Not yet available (Milestone 4)      |
+
+## Engineering calculation methodology
+
+See [docs/engineering-basis/aci318-19-punching-shear.md](docs/engineering-basis/aci318-19-punching-shear.md).
+Every result exposes each step's formula, substituted values, result, unit and ACI 318-19 provision, plus warnings
+(ERROR / WARNING / INFO). Invalid input returns _Calculation unavailable_ with a reason — never a DCR.
+
+## Supported codes
+
+| Code                                       | Status                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| ACI 318-19                                 | Punching shear (interior column)                                    |
+| ACI 318-14 / 318-25, Eurocode 2, CSA A23.3 | Architecture-ready (`engineering-core/src/codes/`), not implemented |
+
+## Calculation verification
+
+[docs/verification/punching-reference-case.md](docs/verification/punching-reference-case.md) compares the engine
+with the supplied reference calculation. Key finding: the reference omits the ACI 318-19 size-effect factor λs;
+the engine applies λs by default (DCR 0.895) and reproduces the reference (DCR 0.785) only with
+`options.applySizeEffectFactor: false`, flagging non-conformance.
+
+## Reporting
+
+PDF and Excel export are planned for Milestone 4. The engine remains the authoritative calculation; Excel formulas
+are for transparency only.
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Highlights: Zod validation on all engine input, security headers in
+`apps/web/next.config.ts`, no secrets in source (`.env` git-ignored), Dependabot, CodeQL and `pnpm audit` in CI.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests fail if any engineering test fails.
+
+## Roadmap
+
+See [docs/architecture/roadmap.md](docs/architecture/roadmap.md).

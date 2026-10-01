@@ -1,0 +1,42 @@
+{
+  "name": "civil-engineering-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Civil engineering structural design and calculation platform",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev --filter=@civil/web",
+    "build": "turbo run build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo run typecheck && tsc -p tsconfig.tests.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:regression": "vitest run tests/regression",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:watch": "vitest",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d db",
+    "db:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@civil/engineering-core": "workspace:*",
+    "@civil/engineering-validation": "workspace:*",
+    "@civil/shared-types": "workspace:*",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "turbo": "^2.11.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}
