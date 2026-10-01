@@ -29,7 +29,7 @@ packages/engineering-core        pure calculation engine, units, code constants,
 packages/engineering-validation  Zod schemas + engineering-aware validation
 packages/shared-types            domain and result types
 packages/engineering-reporting   (planned) PDF
-packages/engineering-excel       (planned) Excel
+packages/engineering-excel       formatted Excel export (ExcelJS)
 packages/ui                      (planned) shared components
 tests/{unit,integration,regression,e2e}
 docs/{architecture,engineering-basis,verification,user-guide}
@@ -93,8 +93,10 @@ the engine applies λs by default (DCR 0.895) and reproduces the reference (DCR 
 
 ## Reporting
 
-PDF and Excel export are planned for Milestone 4. The engine remains the authoritative calculation; Excel formulas
-are for transparency only.
+**Excel** — header button _Export Excel_ downloads a formatted workbook (`packages/engineering-excel`). Calculation
+sheets show the live Excel formula, the engine value and their difference Δ side by side; a unit test evaluates
+every formula and confirms it reproduces the engine. The engine remains authoritative.
+**PDF** — browser _Print / PDF_ for now; a dedicated PDF report is planned (Milestone 4).
 
 ## Security
 

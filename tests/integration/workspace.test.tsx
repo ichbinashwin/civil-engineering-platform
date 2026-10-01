@@ -30,6 +30,14 @@ describe("engineering workspace (human in the loop)", () => {
     expect(screen.queryByLabelText(/^DCR \d/)).toBeNull();
   });
 
+  it("Export Excel button is enabled for a valid result and disabled when unavailable", () => {
+    render(<Workspace />);
+    const button = screen.getByRole("button", { name: "Export Excel" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText("Effective depth d"), { target: { value: "20" } });
+    expect(button.disabled).toBe(true);
+  });
+
   it("adds an opening and reduces bo", () => {
     render(<Workspace />);
     fireEvent.click(screen.getByRole("button", { name: "+ Add opening" }));

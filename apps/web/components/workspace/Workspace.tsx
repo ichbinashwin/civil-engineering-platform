@@ -33,8 +33,8 @@ function loadStored(): Stored | null {
   }
 }
 
-function download(filename: string, content: string) {
-  const blob = new Blob([content], { type: "application/json" });
+function download(filename: string, content: BlobPart, type = "application/json") {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -70,9 +70,37 @@ export function Workspace() {
     }
   }, [form, review]);
 
+  const [excelState, setExcelState] = useState<"idle" | "busy" | "error">("idle");
+  const fileStem = `punching-${form.memberName.replace(/[^\w-]+/g, "_") || "calc"}-rev${form.revision.replace(/[^\w-]+/g, "_") || "0"}`;
+
+  const exportExcel = async () => {
+    if (!outcome.ok) return;
+    setExcelState("busy");
+    try {
+      // Loaded on demand to keep ExcelJS out of the initial bundle.
+      const { exportPunchingWorkbook, XLSX_MIME } = await import("@civil/engineering-excel");
+      const bytes = await exportPunchingWorkbook({
+        project: {
+          name: form.projectName,
+          member: form.memberName,
+          engineer: form.engineer,
+          revision: form.revision,
+        },
+        input,
+        result: outcome,
+        review: review ? { ...review, current: review.inputSignature === inputSignature } : null,
+      });
+      download(`${fileStem}.xlsx`, bytes as Uint8Array<ArrayBuffer>, XLSX_MIME);
+      setExcelState("idle");
+    } catch (error) {
+      console.error("Excel export failed", error);
+      setExcelState("error");
+    }
+  };
+
   const exportSnapshot = () => {
     download(
-      `punching-${form.memberName.replace(/[^\w-]+/g, "_") || "calc"}-rev${form.revision || "0"}.json`,
+      `${fileStem}.json`,
       JSON.stringify(
         {
           exportedAt: new Date().toISOString(),
@@ -111,6 +139,23 @@ export function Workspace() {
           <div className="actions">
             <button type="button" className="btn" onClick={() => window.print()}>
               Print / PDF
+            </button>
+            <button
+              type="button"
+              className="btn excel"
+              onClick={exportExcel}
+              disabled={!outcome.ok || excelState === "busy"}
+              title={
+                outcome.ok
+                  ? "Formatted workbook: Summary, Inputs, Geometry, Punching, Capacity, Audit"
+                  : "Available when the calculation is valid"
+              }
+            >
+              {excelState === "busy"
+                ? "Exporting…"
+                : excelState === "error"
+                  ? "Excel failed — retry"
+                  : "Export Excel"}
             </button>
             <button type="button" className="btn" onClick={exportSnapshot}>
               Export JSON

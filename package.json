@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@civil/engineering-core": "workspace:*",
+    "@civil/engineering-excel": "workspace:*",
     "@civil/engineering-validation": "workspace:*",
     "@civil/shared-types": "workspace:*",
     "@eslint/js": "^10.0.1",
@@ -38,6 +39,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "exceljs": "^4.4.0",
     "globals": "^17.13.0",
     "jsdom": "^30.1.1",
     "prettier": "^3.9.9",

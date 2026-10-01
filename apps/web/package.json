@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@civil/engineering-core": "workspace:*",
+    "@civil/engineering-excel": "workspace:*",
     "@civil/engineering-validation": "workspace:*",
     "@civil/shared-types": "workspace:*",
     "next": "^16.3.8",

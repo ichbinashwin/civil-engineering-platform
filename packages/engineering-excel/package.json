@@ -1,0 +1,20 @@
+{
+  "name": "@civil/engineering-excel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@civil/engineering-core": "workspace:*",
+    "@civil/shared-types": "workspace:*",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}
