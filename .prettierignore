@@ -5,3 +5,4 @@ coverage
 pnpm-lock.yaml
 .turbo
 docs/MASTER_PROMPT.md
+out
