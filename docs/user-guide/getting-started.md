@@ -59,3 +59,7 @@ else console.log(outcome.reason, outcome.action);
   _Inputs_, _Geometry_, _Punching calculation_ (demand + full trace), _Capacity_ (Table 22.6.5.2) and _Audit_
   (engine version, code references, warnings, input snapshot). Yellow cells are live formulas; _Engine value_
   and _Δ_ columns let a checker confirm Excel and the engine agree. Disabled while the calculation is unavailable.
+- **Theme** (header dropdown): _Structural Blue_ (default), _Blueprint_ (drafting-blueprint drawing canvas),
+  _Concrete & Rebar_ (warm greys, rebar-orange accents). **Light / Dark / Auto** toggle next to it; _Auto_
+  follows the operating-system setting. Both choices are remembered in the browser. Colors live in
+  `apps/web/lib/theme.ts` (single source for CSS, plan view and 3D). PASS/FAIL is always shown as text.

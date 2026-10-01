@@ -1,22 +1,57 @@
 @import "tailwindcss";
 
-/* Design tokens — professional engineering workspace (light, restrained). */
+/*
+ * Theme tokens. Defaults = Structural Blue (light) for first paint; ThemeProvider overwrites them
+ * at runtime from lib/theme.ts (single source of truth). Do not hard-code colors elsewhere.
+ */
 :root {
   --bg: #f4f6f8;
   --panel: #ffffff;
+  --panel-alt: #fafbfc;
+  --header-bg: #ffffff;
   --ink: #17212b;
+  --label: #35404a;
   --muted: #66727f;
   --line: #dbe1e6;
-  --blue: #1f4e78;
-  --blue2: #2f6f9f;
-  --green: #16805b;
-  --greenbg: #e9f7f0;
-  --amber: #b7791f;
-  --amberbg: #fff7e6;
-  --red: #b42318;
-  --redbg: #fff0ee;
+  --input-line: #cfd7de;
   --editable: #fffdf2;
+  --track: rgba(0, 0, 0, 0.08);
   --shadow: 0 8px 24px rgba(25, 45, 65, 0.08);
+  --overlay-bg: rgba(255, 255, 255, 0.92);
+  --accent: #1f4e78;
+  --accent-ink: #ffffff;
+  --accent2: #2f6f9f;
+  --accent-text: #1f4e78;
+  --accent-soft: #e8f1f8;
+  --green: #16805b;
+  --green-bg: #e9f7f0;
+  --green-line: #bfe5d4;
+  --amber: #b7791f;
+  --amber-bg: #fff7e6;
+  --amber-line: #f0d9a8;
+  --red: #b42318;
+  --red-bg: #fff0ee;
+  --red-line: #f2b8b5;
+  --excel: #1d6f42;
+  --canvas: #fbfcfd;
+  --grid: #edf0f3;
+  --axis: #aab4be;
+  --svg-text: #35404a;
+  --svg-muted: #66727f;
+  --column: #dceaf5;
+  --column-stroke: #1f4e78;
+  --perimeter: #2f6f9f;
+  --gross: #9aa7b3;
+  --tangent: #d9776f;
+  --opening: #fff0ee;
+  --opening-stroke: #b42318;
+  --centroid: #1f4e78;
+  --critical: #b42318;
+  --slab: #c9d1d9;
+  --slab-edge: #8a96a3;
+  --grid-major: #c5ccd3;
+  --grid-minor: #e3e7eb;
+  --fence-line: #17212b;
   --radius: 14px;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -38,7 +73,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--blue2);
+  outline: 2px solid var(--accent2);
   outline-offset: 2px;
 }
 
@@ -56,7 +91,7 @@ body {
 
 /* Header */
 .app-header {
-  background: #fff;
+  background: var(--header-bg);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
@@ -80,8 +115,8 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--blue);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -102,7 +137,7 @@ body {
 }
 .btn {
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--panel);
   border-radius: 9px;
   padding: 7px 12px;
   cursor: pointer;
@@ -110,20 +145,20 @@ body {
   color: var(--ink);
 }
 .btn:hover {
-  border-color: var(--blue2);
+  border-color: var(--accent2);
 }
 .btn.primary {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 .btn.excel {
-  border-color: #1d6f42;
-  color: #1d6f42;
+  border-color: var(--excel);
+  color: var(--excel);
   font-weight: 600;
 }
 .btn.excel:hover {
-  background: #eaf5ee;
+  background: var(--green-bg);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -140,9 +175,62 @@ body {
   color: var(--muted);
 }
 .btn[aria-pressed="true"] {
-  background: #e8f1f8;
-  border-color: var(--blue2);
-  color: var(--blue);
+  background: var(--accent-soft);
+  border-color: var(--accent2);
+  color: var(--accent-text);
+}
+
+/* Theme controls */
+.theme-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.theme-select {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.mode-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mode-toggle button + button {
+  border-left: 1px solid var(--line);
+}
+.mode-toggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.topbar-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.theme-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 /* Layout */
@@ -199,7 +287,7 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--blue);
+  color: var(--accent-text);
   font-weight: 800;
   margin-bottom: 9px;
   padding: 0;
@@ -221,12 +309,13 @@ body {
 .row label,
 .field-label {
   font-size: 12px;
-  color: #35404a;
+  color: var(--label);
 }
 .input {
   width: 100%;
+  color: var(--ink);
   padding: 7px 8px;
-  border: 1px solid #cfd7de;
+  border: 1px solid var(--input-line);
   border-radius: 7px;
   text-align: right;
   background: var(--editable);
@@ -239,16 +328,16 @@ body {
   font-family: inherit;
 }
 .input:focus {
-  outline: 2px solid #b9d8ef;
-  border-color: var(--blue2);
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent2);
 }
 .input[aria-invalid="true"] {
   border-color: var(--red);
-  background: var(--redbg);
+  background: var(--red-bg);
 }
 select.input {
   text-align: left;
-  background: #fff;
+  background: var(--panel);
   font-family: inherit;
 }
 .unit {
@@ -271,11 +360,11 @@ select.input {
   border-radius: 10px;
   padding: 8px 10px;
   margin-bottom: 10px;
-  background: #fbfcfd;
+  background: var(--panel-alt);
 }
 .opening-card.selected {
   border-color: var(--red);
-  box-shadow: 0 0 0 2px var(--redbg);
+  box-shadow: 0 0 0 2px var(--red-bg);
 }
 .opening-head {
   display: flex;
@@ -305,7 +394,7 @@ select.input {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 10px 11px;
-  background: #fafbfc;
+  background: var(--panel-alt);
 }
 .kpi .label {
   font-size: 11px;
@@ -364,7 +453,7 @@ td.num {
 }
 tr.governing td {
   font-weight: 800;
-  background: #f3f8fc;
+  background: var(--accent-soft);
 }
 .ref {
   color: var(--muted);
@@ -382,34 +471,34 @@ tr.governing td {
   letter-spacing: 0.04em;
 }
 .badge.pass {
-  background: var(--greenbg);
+  background: var(--green-bg);
   color: var(--green);
 }
 .badge.fail {
-  background: var(--redbg);
+  background: var(--red-bg);
   color: var(--red);
 }
 .badge.warn {
-  background: var(--amberbg);
+  background: var(--amber-bg);
   color: var(--amber);
 }
 .badge.info {
-  background: #eef3f8;
-  color: var(--blue);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 .result-card {
   border-radius: 12px;
   padding: 16px;
-  border: 1px solid #bfe5d4;
-  background: var(--greenbg);
+  border: 1px solid var(--green-line);
+  background: var(--green-bg);
 }
 .result-card.fail {
-  border-color: #f2b8b5;
-  background: var(--redbg);
+  border-color: var(--red-line);
+  background: var(--red-bg);
 }
 .result-card.unavailable {
-  border-color: #f0d9a8;
-  background: var(--amberbg);
+  border-color: var(--amber-line);
+  background: var(--amber-bg);
 }
 .result-title {
   font-size: 12px;
@@ -428,7 +517,7 @@ tr.governing td {
   position: relative;
   height: 8px;
   border-radius: 99px;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--track);
   margin: 6px 0 10px;
   overflow: hidden;
 }
@@ -467,7 +556,7 @@ tr.governing td {
 .note {
   font-size: 11px;
   color: var(--muted);
-  background: #f8fafb;
+  background: var(--panel-alt);
   border: 1px solid var(--line);
   padding: 10px;
   border-radius: 9px;
@@ -511,7 +600,7 @@ tr.governing td {
 }
 .tabs button {
   border: 0;
-  background: #fff;
+  background: var(--panel);
   padding: 6px 14px;
   font-size: 12px;
   cursor: pointer;
@@ -519,15 +608,15 @@ tr.governing td {
   color: var(--muted);
 }
 .tabs button[aria-selected="true"] {
-  background: var(--blue);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .canvas-wrap {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   min-height: 360px;
-  background: #fbfcfd;
+  background: var(--canvas);
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
@@ -548,7 +637,7 @@ tr.governing td {
 .overlay {
   position: absolute;
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--overlay-bg);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 8px;

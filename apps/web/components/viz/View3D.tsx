@@ -5,6 +5,9 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { Opening, PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
 import { utilizationRgb } from "@/lib/format";
+import { hexToNumber } from "@/lib/theme";
+import type { Palette } from "@/lib/theme";
+import { useTheme } from "../theme/ThemeProvider";
 
 /**
  * 3D view of slab, column, openings, critical perimeter and the shear-stress "fence"
@@ -101,7 +104,13 @@ function buildScene(
   group: THREE.Group,
   input: PunchingShearInput,
   outcome: PunchingShearOutcome,
-  opts: { xray: boolean; fence: boolean; tangents: boolean; selectedOpening: string | null },
+  opts: {
+    xray: boolean;
+    fence: boolean;
+    tangents: boolean;
+    selectedOpening: string | null;
+    palette: Palette;
+  },
 ) {
   const h = finite(input.slabThickness) && input.slabThickness > 0 ? input.slabThickness : 12;
   const extent = sceneExtent(input);
@@ -131,7 +140,7 @@ function buildScene(
   const slab = new THREE.Mesh(
     new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 48 }),
     new THREE.MeshStandardMaterial({
-      color: 0xc9d1d9,
+      color: hexToNumber(opts.palette.slab),
       roughness: 0.9,
       transparent: opts.xray,
       opacity: opts.xray ? 0.35 : 1,
@@ -142,7 +151,7 @@ function buildScene(
   group.add(slab);
   const slabEdges = new THREE.LineSegments(
     new THREE.EdgesGeometry(slab.geometry, 30),
-    new THREE.LineBasicMaterial({ color: 0x8a96a3 }),
+    new THREE.LineBasicMaterial({ color: hexToNumber(opts.palette.slabEdge) }),
   );
   group.add(slabEdges);
 
@@ -150,7 +159,7 @@ function buildScene(
   input.openings.forEach((o) => {
     if (!openingValid(o)) return;
     const selected = o.id !== undefined && o.id === opts.selectedOpening;
-    const color = selected ? "#ff3b30" : "#b42318";
+    const color = selected ? "#ff3b30" : opts.palette.openingStroke;
     // Red sleeve through the slab so small openings stay visible.
     const wallMaterial = new THREE.MeshBasicMaterial({
       color,
@@ -207,14 +216,14 @@ function buildScene(
     const ext = extent * COLUMN_EXTENSION_FACTOR;
     const column = new THREE.Mesh(
       new THREE.BoxGeometry(c1, c2, h + 2 * ext),
-      new THREE.MeshStandardMaterial({ color: 0x2f6f9f, roughness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: hexToNumber(opts.palette.accent2), roughness: 0.6 }),
     );
     column.position.set(0, 0, h / 2);
     group.add(column);
     group.add(
       new THREE.LineSegments(
         new THREE.EdgesGeometry(column.geometry),
-        new THREE.LineBasicMaterial({ color: 0x1f4e78 }),
+        new THREE.LineBasicMaterial({ color: hexToNumber(opts.palette.accent) }),
       ),
     );
     group.children[group.children.length - 1]?.position.set(0, 0, h / 2);
@@ -224,8 +233,8 @@ function buildScene(
   const grid = new THREE.GridHelper(
     half * 2,
     Math.max(4, Math.round((half * 2) / 12)),
-    0xc5ccd3,
-    0xe3e7eb,
+    hexToNumber(opts.palette.gridMajor),
+    hexToNumber(opts.palette.gridMinor),
   );
   grid.rotation.x = Math.PI / 2;
   grid.position.z = -extent * COLUMN_EXTENSION_FACTOR;
@@ -251,21 +260,29 @@ function buildScene(
         new THREE.Vector3(-gx, gy, zTop),
         new THREE.Vector3(-gx, -gy, zTop),
       ],
-      "#9aa7b3",
+      opts.palette.gross,
       true,
     ),
   );
   r.geometry.openingShadows.forEach((s) =>
     s.removedSegments.forEach((seg) =>
       group.add(
-        ribbon(seg.x1, seg.y1, seg.x2, seg.y2, zTop + 0.1, "#b42318", RIBBON_WIDTH_IN * 1.4),
+        ribbon(
+          seg.x1,
+          seg.y1,
+          seg.x2,
+          seg.y2,
+          zTop + 0.1,
+          opts.palette.critical,
+          RIBBON_WIDTH_IN * 1.4,
+        ),
       ),
     ),
   );
 
   // Effective perimeter ribbons.
   r.geometry.segments.forEach((seg) =>
-    group.add(ribbon(seg.x1, seg.y1, seg.x2, seg.y2, zTop, "#1f4e78")),
+    group.add(ribbon(seg.x1, seg.y1, seg.x2, seg.y2, zTop, opts.palette.perimeter)),
   );
 
   // Tangent lines from the column centroid.
@@ -284,7 +301,7 @@ function buildScene(
               new THREE.Vector3(0, 0, zTop),
               new THREE.Vector3((t.x / len) * reach, (t.y / len) * reach, zTop),
             ],
-            "#d9776f",
+            opts.palette.tangent,
             true,
           ),
         );
@@ -329,7 +346,7 @@ function buildScene(
       group.add(
         line(
           poly.map((p) => new THREE.Vector3(p.x, p.y, zTop + p.stress * scale)),
-          "#17212b",
+          opts.palette.fenceLine,
         ),
       );
     }
@@ -345,7 +362,7 @@ function buildScene(
           new THREE.Vector3(-gx, gy, zc),
           new THREE.Vector3(-gx, -gy, zc),
         ],
-        "#b42318",
+        opts.palette.critical,
         true,
       ),
     );
@@ -355,13 +372,13 @@ function buildScene(
   const crit = r.demand.criticalPoint;
   const critMarker = new THREE.Mesh(
     new THREE.SphereGeometry(Math.max(0.8, extent * 0.02), 20, 14),
-    new THREE.MeshBasicMaterial({ color: 0xb42318 }),
+    new THREE.MeshBasicMaterial({ color: hexToNumber(opts.palette.critical) }),
   );
   critMarker.position.set(crit.x, crit.y, opts.fence ? zTop + crit.stress * scale : zTop);
   group.add(critMarker);
   const centroid = new THREE.Mesh(
     new THREE.SphereGeometry(Math.max(0.6, extent * 0.015), 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0x1f4e78 }),
+    new THREE.MeshBasicMaterial({ color: hexToNumber(opts.palette.centroid) }),
   );
   centroid.position.set(r.geometry.centroidX, r.geometry.centroidY, zTop + 0.5);
   group.add(centroid);
@@ -370,6 +387,7 @@ function buildScene(
 }
 
 export function View3D({ input, outcome, selectedOpening }: View3DProps) {
+  const { palette } = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const ctx = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -402,7 +420,6 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0xfbfcfd);
     host.appendChild(renderer.domElement);
     renderer.domElement.setAttribute(
       "aria-label",
@@ -463,8 +480,10 @@ export function View3D({ input, outcome, selectedOpening }: View3DProps) {
       fence,
       tangents,
       selectedOpening,
+      palette,
     });
-  }, [input, outcome, xray, fence, tangents, selectedOpening]);
+    c.renderer.setClearColor(hexToNumber(palette.canvas));
+  }, [input, outcome, xray, fence, tangents, selectedOpening, palette]);
 
   // Camera presets (also initial fit).
   useEffect(() => {

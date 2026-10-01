@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Opening, PunchingShearInput, PunchingShearOutcome } from "@civil/shared-types";
 import { convertForce, convertMoment } from "@civil/engineering-core";
 import { formatNumber, utilizationColor } from "@/lib/format";
+import type { Palette } from "@/lib/theme";
+import { useTheme } from "../theme/ThemeProvider";
 
 /**
  * Interactive 2D plan of the punching-shear critical section. Pure presentation of engine output:
@@ -31,18 +33,21 @@ const FIT_PADDING = 1.25;
 const ZOOM_STEP = 1.25;
 const DRAG_THRESHOLD_PX = 3;
 
-const COLORS = {
-  column: "#dceaf5",
-  columnStroke: "#1f4e78",
-  gross: "#9aa7b3",
-  removed: "#b42318",
-  opening: "#fff0ee",
-  openingStroke: "#b42318",
-  tangent: "#d9776f",
-  axis: "#aab4be",
-  grid: "#edf0f3",
-  centroid: "#1f4e78",
-};
+/** Drawing colors from the active theme palette. */
+function drawingColors(p: Palette) {
+  return {
+    column: p.column,
+    columnStroke: p.columnStroke,
+    gross: p.gross,
+    removed: p.critical,
+    opening: p.opening,
+    openingStroke: p.openingStroke,
+    tangent: p.tangent,
+    axis: p.axis,
+    grid: p.grid,
+    centroid: p.centroid,
+  };
+}
 
 function finite(...values: number[]): boolean {
   return values.every(Number.isFinite);
@@ -73,6 +78,8 @@ function sceneBounds(input: PunchingShearInput, outcome: PunchingShearOutcome) {
 }
 
 export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: PlanViewProps) {
+  const { palette: P } = useTheme();
+  const COLORS = drawingColors(P);
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 500 });
   const [userView, setUserView] = useState<View | null>(null);
@@ -276,7 +283,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
             setHover(null);
           }}
         >
-          <rect x={0} y={0} width={size.w} height={size.h} fill="#fbfcfd" pointerEvents="none" />
+          <rect x={0} y={0} width={size.w} height={size.h} fill={P.canvas} pointerEvents="none" />
           {gridLines}
           {/* Axes */}
           <line
@@ -295,10 +302,10 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
             stroke={COLORS.axis}
             strokeDasharray="6 4"
           />
-          <text x={size.w - 14} y={sy(0) - 6} fontSize={12} fill="#66727f" textAnchor="end">
+          <text x={size.w - 14} y={sy(0) - 6} fontSize={12} fill={P.svgMuted} textAnchor="end">
             X
           </text>
-          <text x={sx(0) + 6} y={14} fontSize={12} fill="#66727f">
+          <text x={sx(0) + 6} y={14} fontSize={12} fill={P.svgMuted}>
             Y
           </text>
 
@@ -407,7 +414,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                       y1={sy(a.y)}
                       x2={sx(p.x)}
                       y2={sy(p.y)}
-                      stroke={showStress ? utilizationColor(ratio) : "#2f6f9f"}
+                      stroke={showStress ? utilizationColor(ratio) : P.perimeter}
                       strokeWidth={perimeterSelected ? 6 : 4}
                       strokeLinecap="round"
                     />
@@ -497,13 +504,13 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
 
           {/* Dimensions of the critical section */}
           {result && (
-            <g fontSize={10} fill="#35404a">
+            <g fontSize={10} fill={P.svgText}>
               <line
                 x1={sx(-result.geometry.sizeX / 2)}
                 x2={sx(result.geometry.sizeX / 2)}
                 y1={sy(-result.geometry.sizeY / 2) + 18}
                 y2={sy(-result.geometry.sizeY / 2) + 18}
-                stroke="#66727f"
+                stroke={P.svgMuted}
                 markerStart="url(#dim)"
                 markerEnd="url(#dim)"
               />
@@ -515,7 +522,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                 y2={sy(-result.geometry.sizeY / 2)}
                 x1={sx(result.geometry.sizeX / 2) + 18}
                 x2={sx(result.geometry.sizeX / 2) + 18}
-                stroke="#66727f"
+                stroke={P.svgMuted}
                 markerStart="url(#dim)"
                 markerEnd="url(#dim)"
               />
@@ -562,20 +569,20 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
                 cy={sy(result.demand.criticalPoint.y)}
                 r={7}
                 fill="none"
-                stroke="#b42318"
+                stroke={P.critical}
                 strokeWidth={2}
               />
               <circle
                 cx={sx(result.demand.criticalPoint.x)}
                 cy={sy(result.demand.criticalPoint.y)}
                 r={2.5}
-                fill="#b42318"
+                fill={P.critical}
               />
               <text
                 x={sx(result.demand.criticalPoint.x) + 10}
                 y={sy(result.demand.criticalPoint.y) - 10}
                 fontSize={11}
-                fill="#b42318"
+                fill={P.critical}
                 fontWeight={700}
               >
                 vu,max = {formatNumber(result.demand.maximumShearStress, 1)} psi
@@ -584,14 +591,14 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
           )}
 
           {/* Moment vectors (double-headed arrows, right-hand rule) */}
-          <g transform={`translate(${size.w - 112}, ${size.h - 56})`} fontSize={10} fill="#35404a">
+          <g transform={`translate(${size.w - 112}, ${size.h - 56})`} fontSize={10} fill={P.ink}>
             <rect
               x={-8}
               y={-30}
               width={116}
               height={78}
-              fill="rgba(255,255,255,0.9)"
-              stroke="#dbe1e6"
+              fill={P.overlayBg}
+              stroke={P.line}
               rx={6}
             />
             <line
@@ -599,7 +606,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               y1={0}
               x2={44}
               y2={0}
-              stroke="#1f4e78"
+              stroke={P.accentText}
               strokeWidth={1.5}
               markerEnd="url(#dbl)"
             />
@@ -611,24 +618,24 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               y1={0}
               x2={0}
               y2={-24}
-              stroke="#1f4e78"
+              stroke={P.accentText}
               strokeWidth={1.5}
               markerEnd="url(#dbl)"
             />
             <text x={6} y={-18}>
               Muy {formatNumber(convertMoment(input.Muy, "lb-in", "kip-ft"), 1)}
             </text>
-            <text x={0} y={22} fill="#66727f">
+            <text x={0} y={22} fill={P.muted}>
               kip-ft · vectors
             </text>
-            <text x={0} y={36} fill="#66727f">
+            <text x={0} y={36} fill={P.muted}>
               Vu {formatNumber(convertForce(input.Vu, "lb", "kip"), 1)} kip ⊗
             </text>
           </g>
 
           <defs>
             <marker id="dim" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-              <path d="M4,0 L4,8" stroke="#66727f" />
+              <path d="M4,0 L4,8" stroke={P.svgMuted} />
             </marker>
             <marker
               id="dbl"
@@ -642,7 +649,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
               <path
                 d="M0,0 L6,4 L0,8 M5,0 L11,4 L5,8"
                 fill="none"
-                stroke="#1f4e78"
+                stroke={P.accentText}
                 strokeWidth="1.3"
               />
             </marker>
@@ -765,7 +772,7 @@ export function PlanView({ input, outcome, selectedOpening, onSelectOpening }: P
           Tangent lines
         </span>
         <span>⊕ Centroid</span>
-        <span style={{ color: "#b42318" }}>◎ Critical point</span>
+        <span style={{ color: P.critical }}>◎ Critical point</span>
       </div>
     </div>
   );
