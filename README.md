@@ -88,6 +88,11 @@ STATIC_EXPORT=true PAGES_BASE_PATH=/civil-engineering-platform pnpm --filter @ci
 # output: apps/web/out
 ```
 
+**AWS S3.** `.github/workflows/deploy-s3.yml` builds `dist/` and uploads only that directory to an S3 bucket (keyless
+GitHub OIDC → IAM role, immutable caching for hashed assets, optional CloudFront invalidation) on a `v*.*.*` tag or
+manually. Verify the exact bundle locally first with `pnpm verify:dist`. Setup (bucket, CloudFront, IAM policies,
+repository variables): [docs/deployment/aws-s3.md](docs/deployment/aws-s3.md).
+
 GitHub Pages cannot send HTTP headers; the static build carries its Content-Security-Policy as a `<meta>` tag. The
 Docker/server build (`docker/Dockerfile.web`) keeps the full header set.
 

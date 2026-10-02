@@ -28,6 +28,11 @@ export default tseslint.config(
     },
   },
   {
+    // Command-line build/serve scripts report progress on the console.
+    files: ["scripts/**/*.mjs"],
+    rules: { "no-console": "off" },
+  },
+  {
     // Tests assert preconditions explicitly; non-null assertions keep them readable.
     files: ["tests/**/*.{ts,tsx}"],
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },

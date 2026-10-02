@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Developer entry point for the Civil Engineering Platform.
-# Usage: ./run.sh [dev|test|verify|build|start|db|db-down|help] [port]
+# Usage: ./run.sh [dev|test|verify|build|start|dist|db|db-down|help] [port]
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -46,6 +46,7 @@ Commands:
   verify    Lint, typecheck, test and build (same as CI)
   build     Production build
   start     Production build, then serve on http://localhost:\$PORT
+  dist      Build dist/ (the S3 bundle, with integrity checks) and serve it on http://127.0.0.1:\$PORT (default 8080)
   db        Start PostgreSQL in Docker (creates .env from .env.example if missing)
   db-down   Stop PostgreSQL
   help      Show this message
@@ -81,6 +82,10 @@ case "$COMMAND" in
     pnpm build
     echo "Serving production build on http://localhost:$PORT"
     pnpm --filter @civil/web exec next start -p "$PORT"
+    ;;
+  dist)
+    echo "Building dist/ and serving it (the same files the S3 pipeline uploads)..."
+    PORT="${2:-8080}" pnpm verify:dist
     ;;
   db)
     if ! command -v docker >/dev/null 2>&1; then

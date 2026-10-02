@@ -1,0 +1,146 @@
+name: Deploy dist to AWS S3
+
+# Builds the production static site (dist/) and uploads ONLY dist/ to an S3 bucket.
+# Runs on a version tag (v1.2.3) or manually from the Actions tab.
+#
+# Authentication is keyless: GitHub OIDC -> AWS IAM role (no AWS access keys are stored anywhere).
+# Configure once under Settings -> Secrets and variables -> Actions -> Variables:
+#   AWS_ROLE_ARN                IAM role to assume (trust policy: this repo, environment "production")
+#   AWS_REGION                  e.g. eu-central-1
+#   S3_BUCKET                   bucket name (dedicated to this site: files not in dist/ are deleted)
+#   S3_PREFIX                   optional key prefix, e.g. "civil" (no leading/trailing slash)
+#   BASE_PATH                   optional URL prefix the site is served under, e.g. "/civil" (default: bucket root)
+#   CLOUDFRONT_DISTRIBUTION_ID  optional, invalidated after upload
+# If AWS_ROLE_ARN / S3_BUCKET are not set, the build + checks still run and the upload is skipped.
+# Setup guide: docs/deployment/aws-s3.md
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload to S3 after building (untick for a build-and-check-only run)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-s3
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test, build and check dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Engineering tests (unit, regression, integration)
+        run: pnpm test
+
+      - name: Build dist (static export + integrity checks)
+        env:
+          BASE_PATH: ${{ vars.BASE_PATH }}
+        run: pnpm build:dist
+
+      - name: Upload dist artifact (dist/ only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Upload dist to S3
+    needs: build
+    # Skipped (not failed) until the repository variables are configured, or for a build-only manual run.
+    if: ${{ vars.AWS_ROLE_ARN != '' && vars.S3_BUCKET != '' && (github.event_name != 'workflow_dispatch' || inputs.upload) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ steps.summary.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write # OIDC token for AWS
+    env:
+      S3_BUCKET: ${{ vars.S3_BUCKET }}
+      S3_PREFIX: ${{ vars.S3_PREFIX }}
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: civil-platform-deploy-${{ github.run_id }}
+
+      - name: Check bucket and prefix
+        run: |
+          set -euo pipefail
+          case "${S3_PREFIX}" in
+            /*|*/) echo "S3_PREFIX must not start or end with '/'" >&2; exit 1 ;;
+          esac
+          DEST="s3://${S3_BUCKET}${S3_PREFIX:+/${S3_PREFIX}}"
+          echo "DEST=${DEST}" >> "$GITHUB_ENV"
+          aws s3api head-bucket --bucket "${S3_BUCKET}"
+
+      # Hashed build assets first: immutable for a year. New HTML never points at a missing asset.
+      - name: Sync hashed assets (long cache)
+        run: |
+          aws s3 sync dist/_next/static "${DEST}/_next/static" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --delete --only-show-errors
+
+      # Everything else (HTML, RSC payloads, icons, build-info): revalidated on every request.
+      - name: Sync pages and other files (no-cache)
+        run: |
+          aws s3 sync dist "${DEST}" \
+            --exclude "_next/static/*" \
+            --cache-control "no-cache" \
+            --delete --only-show-errors
+
+      - name: Invalidate CloudFront
+        if: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*" > /dev/null
+
+      - name: Summary
+        id: summary
+        run: |
+          {
+            echo "### Deployed dist/ to S3"
+            echo ""
+            echo "- Destination: \`${DEST}\`"
+            echo "- Commit: \`${GITHUB_SHA::7}\`"
+            echo "- Files: $(find dist -type f | wc -l)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "url=${{ vars.SITE_URL }}" >> "$GITHUB_OUTPUT"

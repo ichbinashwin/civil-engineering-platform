@@ -22,7 +22,10 @@
     "test:watch": "vitest",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "db:up": "docker compose -f docker/docker-compose.yml up -d db",
-    "db:down": "docker compose -f docker/docker-compose.yml down"
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "build:dist": "node scripts/build-dist.mjs",
+    "serve:dist": "node scripts/serve-dist.mjs",
+    "verify:dist": "node scripts/build-dist.mjs && node scripts/serve-dist.mjs"
   },
   "devDependencies": {
     "@civil/engineering-core": "workspace:*",
