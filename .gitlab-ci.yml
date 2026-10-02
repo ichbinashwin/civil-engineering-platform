@@ -1,0 +1,35 @@
+# GitLab Pages pipeline (DISABLED BY DEFAULT: it only runs on GitLab, i.e. after you mirror/push this repository
+# to GitLab, and only on a version tag (v1.2.3) or a manual pipeline run from the GitLab UI).
+# Setup: docs/deployment/README.md#gitlab-pages
+#
+# Configure in GitLab -> Settings -> CI/CD -> Variables (none of these is a secret):
+#   BASE_PATH   URL prefix, e.g. "/civil-engineering-platform" for https://<user>.gitlab.io/<project>/ (default "")
+#   RUN_TESTS   "true" (default) runs lint, typecheck and the test suite before building
+
+stages: [deploy]
+
+pages:
+  stage: deploy
+  image: node:24
+  variables:
+    BASE_PATH: ""
+    RUN_TESTS: "true"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+    - |
+      if [ "$RUN_TESTS" = "true" ]; then
+        pnpm lint
+        pnpm typecheck
+        pnpm test
+      fi
+    - pnpm build:dist
+    - rm -rf public
+    - mv dist public
+  artifacts:
+    paths:
+      - public
+    expire_in: 14 days

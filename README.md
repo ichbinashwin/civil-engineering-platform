@@ -88,7 +88,12 @@ STATIC_EXPORT=true PAGES_BASE_PATH=/civil-engineering-platform pnpm --filter @ci
 # output: apps/web/out
 ```
 
-**AWS S3.** `.github/workflows/deploy-s3.yml` builds `dist/` and uploads only that directory to an S3 bucket (keyless
+**Hosting pipelines.** Each provider has its own opt-in workflow; by default only GitHub Pages and Cloudflare Pages
+(inert until `CLOUDFLARE_PROJECT_NAME` is set) are enabled, all others are off. Nothing secret is stored in the
+repository (GitHub Secrets/Variables, OIDC where possible). Overview, defaults and setup per provider (Cloudflare,
+Netlify, Vercel, Firebase, Azure, Codeberg, Render, GitLab, S3): [docs/deployment/README.md](docs/deployment/README.md).
+
+**AWS S3.** `.github/workflows/deploy-s3.yml` (opt in with `DEPLOY_AWS_S3=true`) builds `dist/` and uploads only that directory to an S3 bucket (keyless
 GitHub OIDC → IAM role, immutable caching for hashed assets, optional CloudFront invalidation) on a `v*.*.*` tag or
 manually. Verify the exact bundle locally first with `pnpm verify:dist`. Setup (bucket, CloudFront, IAM policies,
 repository variables): [docs/deployment/aws-s3.md](docs/deployment/aws-s3.md).

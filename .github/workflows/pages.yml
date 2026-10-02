@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 # Publishes the static workspace to https://www.shragavi.com/civil-engineering-platform
 # (project site under the ichbinashwin.github.io user site, which owns the custom domain).
 # Deployment only happens if lint, typecheck and all engineering tests pass.
+# ENABLED BY DEFAULT (free). Turn off with repository variable DEPLOY_GITHUB_PAGES=false.
 
 on:
   push:
@@ -20,6 +21,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ vars.DEPLOY_GITHUB_PAGES != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

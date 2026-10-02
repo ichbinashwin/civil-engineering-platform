@@ -1,0 +1,75 @@
+name: Deploy to Cloudflare Pages
+
+# Uploads dist/ to a Cloudflare Pages project (free, unlimited bandwidth, custom headers).
+# ENABLED BY DEFAULT (free): deploys on every version tag (v1.2.3) once CLOUDFLARE_PROJECT_NAME is set; until then
+# a tag push does nothing. Turn off with repository variable DEPLOY_CLOUDFLARE=false.
+# A manual run (Actions tab -> Run workflow) always works. Setup: docs/deployment/README.md#cloudflare-pages
+#
+# Secrets   CLOUDFLARE_API_TOKEN      API token with "Cloudflare Pages: Edit"
+# Variables CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_PROJECT_NAME (required)
+#           CLOUDFLARE_BRANCH (production branch of the project, default "main"), CLOUDFLARE_BASE_PATH (default "")
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || (vars.DEPLOY_CLOUDFLARE != 'false' && vars.CLOUDFLARE_PROJECT_NAME != '') }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.CLOUDFLARE_BASE_PATH }}
+
+  deploy:
+    name: Deploy dist/
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: cloudflare
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate configuration
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PROJECT_NAME }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${TOKEN}" ] || missing="${missing} secret CLOUDFLARE_API_TOKEN"
+          [ -n "${ACCOUNT}" ] || missing="${missing} variable CLOUDFLARE_ACCOUNT_ID"
+          [ -n "${PROJECT}" ] || missing="${missing} variable CLOUDFLARE_PROJECT_NAME"
+          if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
+          [[ "${PROJECT}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "::error::CLOUDFLARE_PROJECT_NAME must be lowercase letters, digits and hyphens"; exit 1; }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+
+      - name: Add Cloudflare security headers (_headers)
+        run: node scripts/add-provider-config.mjs cloudflare
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME }} --branch=${{ vars.CLOUDFLARE_BRANCH || 'main' }} --commit-hash=${{ github.sha }} --commit-dirty=true

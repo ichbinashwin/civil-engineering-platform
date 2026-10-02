@@ -1,0 +1,93 @@
+name: Deploy to Firebase Hosting
+
+# Uploads dist/ to Firebase Hosting (free Spark plan, <project>.web.app, custom headers).
+# KEYLESS: authenticates with Google Workload Identity Federation (no service-account key stored anywhere).
+# Opt in: set repository variable DEPLOY_FIREBASE=true to deploy on every version tag (v1.2.3).
+# A manual run always works. Setup: docs/deployment/README.md#firebase-hosting
+#
+# Secrets   none
+# Variables GCP_WORKLOAD_IDENTITY_PROVIDER  projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+#           GCP_SERVICE_ACCOUNT             deploy@PROJECT.iam.gserviceaccount.com (role: Firebase Hosting Admin)
+#           FIREBASE_PROJECT_ID (required), FIREBASE_SITE (optional extra site id), FIREBASE_BASE_PATH (default ""),
+#           FIREBASE_TOOLS_VERSION (default pinned below)
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-firebase
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_FIREBASE == 'true' }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.FIREBASE_BASE_PATH }}
+
+  deploy:
+    name: Deploy dist/
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: firebase
+    permissions:
+      contents: read
+      id-token: write # OIDC token for Google Workload Identity Federation
+    env:
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_SITE: ${{ vars.FIREBASE_SITE }}
+      FIREBASE_TOOLS_VERSION: ${{ vars.FIREBASE_TOOLS_VERSION || '15.32.1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate configuration
+        env:
+          WIF: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SA: ${{ vars.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${WIF}" ] || missing="${missing} variable GCP_WORKLOAD_IDENTITY_PROVIDER"
+          [ -n "${SA}" ] || missing="${missing} variable GCP_SERVICE_ACCOUNT"
+          [ -n "${FIREBASE_PROJECT_ID}" ] || missing="${missing} variable FIREBASE_PROJECT_ID"
+          if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
+          [[ "${FIREBASE_TOOLS_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::FIREBASE_TOOLS_VERSION must be an exact version like 15.32.1"; exit 1; }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+
+      - name: Authenticate to Google Cloud (keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Generate firebase.json (headers, public dir)
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_SITE}" ]; then
+            node scripts/add-provider-config.mjs firebase --site "${FIREBASE_SITE}"
+          else
+            node scripts/add-provider-config.mjs firebase
+          fi
+
+      - name: Deploy to Firebase Hosting
+        run: |
+          set -euo pipefail
+          npx --yes "firebase-tools@${FIREBASE_TOOLS_VERSION}" deploy \
+            --only hosting --project "${FIREBASE_PROJECT_ID}" --non-interactive \
+            --message "GitHub ${GITHUB_REF_NAME} ${GITHUB_SHA::7}"

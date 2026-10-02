@@ -1,0 +1,62 @@
+name: Build dist (reusable)
+
+# Shared by every deploy-*.yml: gates on lint, typecheck and all engineering tests, builds the production
+# static site (dist/) with integrity checks, and publishes it as the artifact "site-dist" (dist/ only).
+
+on:
+  workflow_call:
+    inputs:
+      base_path:
+        description: 'URL prefix the site is served under, e.g. "/civil" (empty = domain root)'
+        type: string
+        default: ""
+      run_tests:
+        description: "Run lint, typecheck and the test suite before building"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test, build and check dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: ${{ inputs.run_tests }}
+        run: pnpm lint
+
+      - name: Typecheck
+        if: ${{ inputs.run_tests }}
+        run: pnpm typecheck
+
+      - name: Engineering tests (unit, regression, integration)
+        if: ${{ inputs.run_tests }}
+        run: pnpm test
+
+      - name: Build dist (static export + integrity checks)
+        env:
+          BASE_PATH: ${{ inputs.base_path }}
+        run: pnpm build:dist
+
+      - name: Upload dist artifact (dist/ only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 14

@@ -27,3 +27,7 @@ test-results/
 
 # logs
 *.log
+
+# generated at deploy time by scripts/add-provider-config.mjs
+firebase.json
+.vercel/

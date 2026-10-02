@@ -4,6 +4,9 @@ The app is fully client-side (the engineering engines run in the browser), so th
 files. `pnpm build:dist` produces them in `dist/`; the workflow `.github/workflows/deploy-s3.yml` uploads **only
 `dist/`** to your bucket. No server, no Node runtime, no secrets in the bundle.
 
+This pipeline is **off by default**: set repository variable `DEPLOY_AWS_S3=true` to run it on version tags (manual runs
+always work). See [README.md](README.md) for all providers.
+
 ## Verify locally first
 
 ```bash

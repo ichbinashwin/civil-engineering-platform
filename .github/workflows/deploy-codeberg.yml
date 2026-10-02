@@ -1,0 +1,73 @@
+name: Deploy to Codeberg Pages
+
+# Publishes dist/ to the "pages" branch of a Codeberg repository (free, EU non-profit, <user>.codeberg.page).
+# Opt in: set repository variable DEPLOY_CODEBERG=true to deploy on every version tag (v1.2.3).
+# A manual run always works. Setup: docs/deployment/README.md#codeberg-pages
+#
+# Secrets   CODEBERG_TOKEN                access token with write:repository for the target repo
+# Variables CODEBERG_USER, CODEBERG_REPO (required), CODEBERG_BRANCH (default "pages"), CODEBERG_BASE_PATH (default "")
+# The branch is force-pushed as a single-commit snapshot: use a dedicated branch.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-codeberg
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_CODEBERG == 'true' }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.CODEBERG_BASE_PATH }}
+
+  deploy:
+    name: Publish dist/
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: codeberg
+    env:
+      CODEBERG_USER: ${{ vars.CODEBERG_USER }}
+      CODEBERG_REPO: ${{ vars.CODEBERG_REPO }}
+      CODEBERG_BRANCH: ${{ vars.CODEBERG_BRANCH || 'pages' }}
+      CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+    steps:
+      - name: Validate configuration
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${CODEBERG_TOKEN}" ] || missing="${missing} secret CODEBERG_TOKEN"
+          [ -n "${CODEBERG_USER}" ] || missing="${missing} variable CODEBERG_USER"
+          [ -n "${CODEBERG_REPO}" ] || missing="${missing} variable CODEBERG_REPO"
+          if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
+          for v in "${CODEBERG_USER}" "${CODEBERG_REPO}" "${CODEBERG_BRANCH}"; do
+            [[ "${v}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::Invalid characters in a Codeberg variable"; exit 1; }
+          done
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+
+      - name: Push dist/ to the pages branch
+        run: |
+          set -euo pipefail
+          auth="$(printf '%s:%s' "${CODEBERG_USER}" "${CODEBERG_TOKEN}" | base64 -w0)"
+          echo "::add-mask::${auth}"
+          cd dist
+          git init -q -b "${CODEBERG_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_REF_NAME} (${GITHUB_SHA::7})"
+          git -c http.extraheader="Authorization: Basic ${auth}" push --force \
+            "https://codeberg.org/${CODEBERG_USER}/${CODEBERG_REPO}.git" "HEAD:refs/heads/${CODEBERG_BRANCH}"

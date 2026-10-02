@@ -1,0 +1,48 @@
+name: Deploy to Render
+
+# Render builds the static site itself from this repository (see render.yaml). This workflow first gates on
+# lint, typecheck, tests and the dist build, then triggers a Render deploy through the service's deploy hook.
+# Free static sites: <name>.onrender.com.
+# Opt in: set repository variable DEPLOY_RENDER=true to deploy on every version tag (v1.2.3).
+# A manual run always works. Setup: docs/deployment/README.md#render
+#
+# Secrets   RENDER_DEPLOY_HOOK_URL    the service's deploy hook URL (it contains a key: keep it secret)
+# Variables RENDER_BASE_PATH (default "")  - must equal the BASE_PATH environment variable set in Render
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-render
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_RENDER == 'true' }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.RENDER_BASE_PATH }}
+
+  deploy:
+    name: Trigger Render deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: render
+    steps:
+      - name: Validate configuration and trigger deploy hook
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${HOOK}" ] || { echo "::error::Missing: secret RENDER_DEPLOY_HOOK_URL"; exit 1; }
+          [[ "${HOOK}" == https://api.render.com/deploy/* ]] || { echo "::error::RENDER_DEPLOY_HOOK_URL must start with https://api.render.com/deploy/"; exit 1; }
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --request POST "${HOOK}")"
+          echo "Render responded with HTTP ${status}"
+          [ "${status}" -ge 200 ] && [ "${status}" -lt 300 ]

@@ -1,7 +1,8 @@
 name: Deploy dist to AWS S3
 
 # Builds the production static site (dist/) and uploads ONLY dist/ to an S3 bucket.
-# Runs on a version tag (v1.2.3) or manually from the Actions tab.
+# DISABLED BY DEFAULT: set repository variable DEPLOY_AWS_S3=true to deploy on every version tag (v1.2.3).
+# A manual run from the Actions tab always works.
 #
 # Authentication is keyless: GitHub OIDC -> AWS IAM role (no AWS access keys are stored anywhere).
 # Configure once under Settings -> Secrets and variables -> Actions -> Variables:
@@ -33,43 +34,10 @@ concurrency:
 
 jobs:
   build:
-    name: Test, build and check dist
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Engineering tests (unit, regression, integration)
-        run: pnpm test
-
-      - name: Build dist (static export + integrity checks)
-        env:
-          BASE_PATH: ${{ vars.BASE_PATH }}
-        run: pnpm build:dist
-
-      - name: Upload dist artifact (dist/ only)
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-dist
-          path: dist
-          if-no-files-found: error
-          retention-days: 14
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_AWS_S3 == 'true' }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.BASE_PATH }}
 
   deploy:
     name: Upload dist to S3
@@ -101,7 +69,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: civil-platform-deploy-${{ github.run_id }}
 
-      - name: Check bucket and prefix
+      - name: Validate configuration (bucket and prefix)
         run: |
           set -euo pipefail
           case "${S3_PREFIX}" in

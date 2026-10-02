@@ -1,0 +1,73 @@
+name: Deploy to Netlify
+
+# Uploads dist/ to a Netlify site (free plan, <name>.netlify.app, custom headers).
+# Opt in: set repository variable DEPLOY_NETLIFY=true to deploy on every version tag (v1.2.3).
+# A manual run always works. Setup: docs/deployment/README.md#netlify
+#
+# Secrets   NETLIFY_AUTH_TOKEN         personal access token
+# Variables NETLIFY_SITE_ID (required), NETLIFY_BASE_PATH (default ""), NETLIFY_CLI_VERSION (default pinned below)
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-netlify
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.DEPLOY_NETLIFY == 'true' }}
+    uses: ./.github/workflows/_build-dist.yml
+    with:
+      base_path: ${{ vars.NETLIFY_BASE_PATH }}
+
+  deploy:
+    name: Deploy dist/
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: netlify
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+      NETLIFY_CLI_VERSION: ${{ vars.NETLIFY_CLI_VERSION || '27.10.2' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate configuration
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${NETLIFY_AUTH_TOKEN}" ] || missing="${missing} secret NETLIFY_AUTH_TOKEN"
+          [ -n "${NETLIFY_SITE_ID}" ] || missing="${missing} variable NETLIFY_SITE_ID"
+          if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
+          [[ "${NETLIFY_CLI_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::NETLIFY_CLI_VERSION must be an exact version like 27.10.2"; exit 1; }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+
+      - name: Add Netlify security headers (_headers)
+        run: node scripts/add-provider-config.mjs netlify
+
+      - name: Deploy to Netlify
+        id: deploy
+        run: |
+          set -euo pipefail
+          npx --yes "netlify-cli@${NETLIFY_CLI_VERSION}" deploy \
+            --dir=dist --prod --site "${NETLIFY_SITE_ID}" \
+            --message "GitHub ${GITHUB_REF_NAME} ${GITHUB_SHA::7}" --json > netlify-result.json
+          echo "url=$(node -p "JSON.parse(require('fs').readFileSync('netlify-result.json','utf8')).url || ''")" >> "$GITHUB_OUTPUT"
