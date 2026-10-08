@@ -60,7 +60,7 @@ jobs:
           if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
           [[ "${FIREBASE_TOOLS_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::FIREBASE_TOOLS_VERSION must be an exact version like 15.32.1"; exit 1; }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 

@@ -50,7 +50,7 @@ jobs:
           if [ -n "${missing}" ]; then echo "::error::Missing:${missing}"; exit 1; fi
           [[ "${NETLIFY_CLI_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::NETLIFY_CLI_VERSION must be an exact version like 27.10.2"; exit 1; }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
