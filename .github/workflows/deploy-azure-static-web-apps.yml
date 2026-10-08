@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           [ -n "${TOKEN}" ] || { echo "::error::Missing: secret AZURE_STATIC_WEB_APPS_API_TOKEN"; exit 1; }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
