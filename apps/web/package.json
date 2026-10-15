@@ -14,7 +14,7 @@
     "@civil/engineering-excel": "workspace:*",
     "@civil/engineering-validation": "workspace:*",
     "@civil/shared-types": "workspace:*",
-    "next": "^16.3.8",
+    "next": "^16.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "three": "^0.186.1"
